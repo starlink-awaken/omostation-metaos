@@ -22,86 +22,24 @@ from metaos.core.workflow_parser import WorkflowParser
 logger = logging.getLogger("metaos.workflow_planner")
 
 
-# ─── Heuristic Task Templates ────────────────────────────────────────────────
+from pathlib import Path
+import yaml
 
-TASK_PATTERNS = [
-    {
-        "keywords": ["研究", "research", "调研", "了解", "分析"],
-        "template": [
-            {"id": "gather", "type": "research", "prompt": "围绕以下主题收集信息：{task}"},
-            {"id": "analyze", "type": "reasoning", "prompt": "分析以下收集到的信息，提炼 3 个关键发现：{task}", "depends_on": ["gather"]},
-            {"id": "report", "type": "reasoning", "prompt": "基于以上分析，生成一份简洁的研究报告（含摘要、发现、建议）：{task}", "depends_on": ["analyze"]},
-        ]
-    },
-    {
-        "keywords": ["写", "撰写", "起草", "draft", "write", "文章", "报告", "文档"],
-        "template": [
-            {"id": "outline", "type": "reasoning", "prompt": "为以下写作任务制定详细大纲：{task}"},
-            {"id": "draft", "type": "reasoning", "prompt": "根据大纲撰写正文：{task}", "depends_on": ["outline"]},
-            {"id": "review", "type": "reasoning", "prompt": "审查并优化以下内容，提出具体改进建议：{task}", "depends_on": ["draft"]},
-        ]
-    },
-    {
-        "keywords": ["代码", "实现", "开发", "code", "implement", "develop", "编写"],
-        "template": [
-            {"id": "design", "type": "reasoning", "prompt": "设计以下功能的技术方案（接口、数据结构、核心逻辑）：{task}"},
-            {"id": "implement", "type": "code_gen", "prompt": "根据设计方案实现代码：{task}", "depends_on": ["design"]},
-            {"id": "test", "type": "reasoning", "prompt": "为以下代码生成测试用例和验收标准：{task}", "depends_on": ["implement"]},
-        ]
-    },
-    {
-        "keywords": ["规划", "计划", "plan", "roadmap", "路线图", "方案"],
-        "template": [
-            {"id": "situation", "type": "info_retrieval", "prompt": "分析当前现状和背景：{task}"},
-            {"id": "options", "type": "reasoning", "prompt": "列举 3 个可选方案及其优缺点：{task}", "depends_on": ["situation"]},
-            {"id": "plan", "type": "reasoning", "prompt": "综合以上选项，制定最终行动计划（含时间节点和关键里程碑）：{task}", "depends_on": ["options"]},
-        ]
-    },
-    {
-        "keywords": ["总结", "汇总", "summarize", "归纳", "梳理"],
-        "template": [
-            {"id": "collect", "type": "info_retrieval", "prompt": "收集相关信息：{task}"},
-            {"id": "summarize", "type": "reasoning", "prompt": "对收集到的内容进行结构化总结：{task}", "depends_on": ["collect"]},
-        ]
-    },
-]
+def _load_templates():
+    template_path = Path(__file__).parent.parent / "templates" / "workflow_planner.yaml"
+    try:
+        with open(template_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+            return (
+                data.get("task_patterns", []),
+                data.get("default_template", []),
+                data.get("system_prompt", "")
+            )
+    except Exception as e:
+        logger.error(f"Failed to load planner templates: {e}")
+        return [], [], ""
 
-DEFAULT_TEMPLATE = [
-    {"id": "understand", "type": "reasoning", "prompt": "理解并拆解以下任务的核心目标和约束：{task}"},
-    {"id": "execute", "type": "reasoning", "prompt": "执行以下任务并输出结果：{task}", "depends_on": ["understand"]},
-]
-
-
-# ─── LLM-based Planner ───────────────────────────────────────────────────────
-
-PLANNER_SYSTEM_PROMPT = """\
-你是一个任务拆解专家。给定用户的任务描述，你需要将其分解为一个有向无环图（DAG）工作流。
-
-可用的节点类型：
-- research: 调用外部 Agent 搜索和收集信息
-- reasoning: 调用推理引擎进行分析、总结、规划
-- code_gen: 生成代码
-- info_retrieval: 检索结构化数据
-
-规则：
-1. 节点数量控制在 2-5 个
-2. 每个节点必须有唯一的 id（英文小写+下划线）
-3. depends_on 必须引用已存在的节点 id
-4. prompt 必须具体描述该节点要做什么，包含原始任务的关键内容
-
-你的输出必须是合法的 JSON 格式，包含 workflow_id 和 nodes 字段，绝对不要输出其他内容。
-
-示例输出：
-{
-  "workflow_id": "research_rag_2024",
-  "name": "RAG 架构研究",
-  "nodes": [
-    {"id": "gather", "type": "research", "prompt": "搜集 RAG 架构的最新进展和最佳实践"},
-    {"id": "analyze", "type": "reasoning", "prompt": "分析 RAG 与 Fine-tuning 的对比优势", "depends_on": ["gather"]},
-    {"id": "report", "type": "reasoning", "prompt": "输出一份 RAG 技术选型建议报告", "depends_on": ["analyze"]}
-  ]
-}
-"""
+TASK_PATTERNS, DEFAULT_TEMPLATE, PLANNER_SYSTEM_PROMPT = _load_templates()
 
 
 class WorkflowPlanner:
