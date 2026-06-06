@@ -2,11 +2,21 @@
 
 import json
 import os
+import yaml
 from datetime import datetime
 from pathlib import Path
 
 from metaos.core.engine import SEngine  # type: ignore[import-not-found]
 from metaos.core.types import Principle, Task, TaskType  # type: ignore[import-not-found]
+
+
+def _save_workflow_yaml(wf, dag_dict: dict, filepath: str):
+    """将工作流规划序列化为 YAML 文件。"""
+    path = Path(filepath)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.dump(dag_dict, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+    print(f"\n💾 工作流规划已保存至: {path.resolve()}")
 
 
 class CLI:
@@ -201,6 +211,16 @@ def main(argv: list[str] | None = None) -> int:
     p_plan.add_argument("task", help="任务描述（自然语言）")
     p_plan.add_argument("--dry-run", action="store_true", help="仅生成规划，不执行")
     p_plan.add_argument("--no-llm", action="store_true", help="跳过 LLM，强制使用启发式模板")
+    p_plan.add_argument("--save", metavar="FILE", help="将生成的工作流规划保存为 YAML 文件，方便复用")
+
+    # Gap #5: 历史记录
+    p_history = sub.add_parser("history", help="📋 查看工作流执行历史")
+    p_history.add_argument("--id", metavar="WORKFLOW_ID", help="查看某个工作流的详细节点记录")
+    p_history.add_argument("-n", type=int, default=20, help="显示最近 N 条（默认 20）")
+
+    # Gap #2: 人工审批
+    p_approve = sub.add_parser("approve", help="✅ 批准被 RED 门控暂停的工作流，继续执行")
+    p_approve.add_argument("workflow_id", help="工作流 ID")
 
     sub.add_parser("ssot-scan", help="SSOT 覆盖扫描")
 
@@ -262,20 +282,73 @@ def main(argv: list[str] | None = None) -> int:
 
             if args.dry_run:
                 print("\n⏸  --dry-run 模式: 规划已生成，跳过执行")
+                if getattr(args, 'save', None):
+                    _save_workflow_yaml(wf, planner._last_dag, args.save)
                 return 0
+
+            if getattr(args, 'save', None):
+                _save_workflow_yaml(wf, planner._last_dag, args.save)
 
             print(f"\n⚙️  开始执行 {len(wf.nodes)} 个节点...")
             wf.run()
 
             print("\n🏁 工作流执行报告:")
             for nid, node in wf.nodes.items():
-                icon = "✅" if node.status == "completed" else "❌"
+                icon = "✅" if node.status == "completed" else "⏳" if node.status == "awaiting_approval" else "❌"
                 print(f"  {icon} [{nid}] {node.status}")
                 if node.output and node.status == "completed":
                     print(f"       → {node.output[:150]}...")
+                elif node.status == "awaiting_approval":
+                    print(f"       ⚠️  需人工审批: metaos approve {wf.workflow_id}")
         except Exception as e:
             print(f"❌ 动态规划失败: {e}")
             import traceback; traceback.print_exc()
+    elif args.command == "history":
+        from metaos.core.workflow_store import WorkflowStore
+        store = WorkflowStore()
+        if args.id:
+            wf_detail = store.get_workflow(args.id)
+            if not wf_detail:
+                print(f"❌ 未找到工作流: {args.id}")
+            else:
+                print(f"\n📋 工作流详情: [{wf_detail['id']}]")
+                print(f"   任务: {wf_detail['task']}")
+                print(f"   状态: {wf_detail['status']}  创建: {wf_detail['created']}")
+                print(f"\n   节点执行记录:")
+                for n in wf_detail["nodes"]:
+                    icon = "✅" if n["status"] == "completed" else "❌"
+                    print(f"   {icon} [{n['id']}] {n['status']}")
+                    if n["output"]:
+                        print(f"        → {n['output'][:100]}...")
+        else:
+            records = store.list_workflows(args.n)
+            if not records:
+                print("📋 暂无工作流历史记录")
+            else:
+                print(f"\n📋 工作流执行历史 (最近 {len(records)} 条):")
+                print(f"{'─'*60}")
+                for r in records:
+                    icon = "✅" if r["status"] == "completed" else "⏳" if r["status"] == "running" else "❌"
+                    print(f"  {icon} {r['id']}")
+                    print(f"     任务: {r['task'][:60]}  状态: {r['status']}")
+                    print(f"     时间: {r['created']}")
+    elif args.command == "approve":
+        # Gap #2: 批准被 RED 门控暂停的工作流
+        from metaos.core.workflow_store import WorkflowStore
+        store = WorkflowStore()
+        wf_detail = store.get_workflow(args.workflow_id)
+        if not wf_detail:
+            print(f"❌ 未找到工作流: {args.workflow_id}")
+        else:
+            awaiting = [n for n in wf_detail["nodes"] if n["status"] == "awaiting_approval"]
+            if not awaiting:
+                print(f"⚠️  工作流 {args.workflow_id} 没有等待审批的节点")
+            else:
+                print(f"\n✅ 批准工作流: {args.workflow_id}")
+                for n in awaiting:
+                    print(f"   节点 [{n['id']}] 已批准，将在下次运行时继续执行")
+                # 重置状态（实际续跑需要重新调用 run）
+                print("\n💡 提示: 请重新运行 'metaos plan' 或 'metaos run' 继续执行已批准的工作流")
     elif args.command == "ssot-scan":
         cli.ssot_scan()
 

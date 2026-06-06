@@ -111,6 +111,7 @@ class WorkflowPlanner:
         self.engine = engine
         self.use_llm = use_llm
         self._parser = WorkflowParser(engine)
+        self._last_dag: dict = {}  # stores last generated DAG for --save
 
     def plan(self, task: str, auto_run: bool = False) -> Workflow:
         """
@@ -138,7 +139,7 @@ class WorkflowPlanner:
             dag_dict = self._plan_with_heuristics(task)
 
         print(f"   ✅ 规划完成: {len(dag_dict['nodes'])} 个节点")
-
+        self._last_dag = dag_dict  # persist for --save
         wf = self._parser.parse_dict(dag_dict)
         return wf
 
