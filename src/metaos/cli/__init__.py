@@ -221,9 +221,21 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "run":
         from metaos.core.workflow_parser import WorkflowParser
         try:
+            # 系统级自动鉴权（Workflow 以 metaos_system 身份运行）
+            token = engine.register_h("metaos_system", "MetaOS Workflow Runner")
+            engine.authenticate(token)
+            
             parser_engine = WorkflowParser(engine)
             wf = parser_engine.parse_file(args.file)
+            print(f"\n🚀 启动工作流: {wf.workflow_id} ({len(wf.nodes)} 节点)")
             wf.run()
+            
+            print("\n🏁 工作流执行报告:")
+            for nid, node in wf.nodes.items():
+                icon = "✅" if node.status == "completed" else "❌"
+                print(f"  {icon} [{nid}] {node.status}")
+                if node.output:
+                    print(f"       → {node.output[:120]}...")
         except Exception as e:
             print(f"❌ 工作流执行失败: {e}")
     elif args.command == "ssot-scan":
