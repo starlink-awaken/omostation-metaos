@@ -91,13 +91,18 @@ class WorkflowPlanner:
             if not model:
                 return None
 
+            # Load L4 CARDS context for alignment
+            from metaos.core.cards_context import get_cards_context
+            l4_context = get_cards_context()
+            system_prompt = PLANNER_SYSTEM_PROMPT + l4_context
+
             print(f"   🤖 调用 LLM ({model}) 生成规划...")
             r = requests.post(
                 "http://localhost:11434/v1/chat/completions",
                 json={
                     "model": model,
                     "messages": [
-                        {"role": "system", "content": PLANNER_SYSTEM_PROMPT},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": f"请为以下任务生成工作流 DAG：\n{task}"},
                     ],
                     "temperature": 0.1,
