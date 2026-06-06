@@ -62,7 +62,7 @@ class SEngine:
         self._community = None
 
         # V5#1 修复：元治理集成——V6#6 修复：传入 d 作为持久化层
-        from layers.governance import MetaGovernance  # type: ignore[import-not-found]
+        from metaos.layers.governance import MetaGovernance  # type: ignore[import-not-found]
 
         self.governance = MetaGovernance(
             scenario="personal",
@@ -198,7 +198,7 @@ class SEngine:
         # V6#7 惰性创建：首次注册后才 init community
         # B-01 修复：传入回调，社区提案通过后自动走 gate/immune 管道
         if self._community is None:
-            from layers.community import CommunityEngine  # type: ignore[import-not-found]
+            from metaos.layers.community import CommunityEngine  # type: ignore[import-not-found]
 
             self._community = CommunityEngine(
                 on_proposal_approved=self.accept_community_proposal,
@@ -236,7 +236,7 @@ class SEngine:
     def community(self):
         """V6#7 惰性访问——B-01 修复：传入回调"""
         if self._community is None:
-            from layers.community import CommunityEngine
+            from metaos.layers.community import CommunityEngine
 
             self._community = CommunityEngine(
                 on_proposal_approved=self.accept_community_proposal,
