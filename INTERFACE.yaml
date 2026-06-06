@@ -1,0 +1,22 @@
+# MetaOS Interface Registry
+project: metaos
+layer: L2
+description: 编排引擎 (决策门控/免疫监控/路由)
+
+cli:
+  - name: metaos
+    module: metaos.cli:main
+    description: 5 子命令 (status/trace/gate/review/ssot-scan)
+
+mcp:
+  server: metaos.mcp_server
+  tools: 11
+  transport: [stdio]
+
+http: []
+
+dependencies:
+  runtime: [fastmcp, structlog]
+  dev: [pytest, pytest-asyncio, ruff]
+
+tests: 163
