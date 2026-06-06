@@ -1,0 +1,10 @@
+workflow_id: "demo-campaign"
+name: "Demo Knowledge Campaign"
+nodes:
+  - id: "scan_news"
+    type: "info_retrieval"
+    prompt: "Scan the latest news regarding MetaOS architecture."
+  - id: "summarize_news"
+    type: "reasoning"
+    prompt: "Summarize the key points."
+    depends_on: ["scan_news"]

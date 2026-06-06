@@ -92,18 +92,38 @@ class L2Controller:
             # Clamp pid_output to [0, 1] for reduction factor
             reduction = max(0.0, min(1.0, pid_output))
             new_concurrency = max(0, int(state["base_concurrency"] * (1.0 - reduction)))
+            _log.info("L0 SSB: Signaling reduction for %s to %d concurrency", service, new_concurrency)
         else:
             new_concurrency = state["base_concurrency"]
 
         state["concurrency"] = new_concurrency
 
+        if zone != "normal":
+            # 强制将重大决断写入 L0 SSB Immutable Log (X1 侧链锚定)
+            try:
+                import httpx
+                httpx.post(
+                    "http://127.0.0.1:8080/v1/tools/call",
+                    json={
+                        "name": "append_ssb_log",
+                        "arguments": {
+                            "event_type": "L2_CIRCUIT_BREAK",
+                            "agent_name": "metaos.l2_controller",
+                            "summary": f"L2 Controller shifted {service} to {zone} zone",
+                            "detail": f"New concurrency: {new_concurrency}, latency: {latency_ms}ms"
+                        }
+                    },
+                    timeout=1.0
+                )
+            except Exception as e:
+                _log.warning("Failed to anchor L2 circuit breaking to L0 SSB", exc_info=e)
+
         return {
+            "ok": True,
             "service": service,
             "zone": zone,
             "concurrency": new_concurrency,
-            "latency_ms": latency_ms,
-            "error_rate": error_rate,
-            "cpu_pct": cpu_pct,
+            "status": READONLY_MSG if zone != "normal" else "normal",
         }
 
     # ── PID Controller ──

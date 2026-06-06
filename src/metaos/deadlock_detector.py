@@ -222,7 +222,7 @@ class DeadlockDetector:
 
         checkpoint = self._checkpoints.get(terminate)
 
-        return {
+        resolution = {
             "suggested": True,
             "deadlock_id": "→".join(cycle),
             "agents_in_cycle": registered,
@@ -232,6 +232,27 @@ class DeadlockDetector:
             "reason": f"lowest_priority (P{self._agent_priority[terminate]}) in deadlock cycle",
             "message": READONLY_MSG,
         }
+
+        # 强制将死锁决断写入 L0 SSB Immutable Log (X1 侧链锚定)
+        try:
+            import httpx
+            httpx.post(
+                "http://127.0.0.1:8080/v1/tools/call",
+                json={
+                    "name": "append_ssb_log",
+                    "arguments": {
+                        "event_type": "DEADLOCK_RESOLUTION",
+                        "agent_name": "metaos.deadlock_detector",
+                        "summary": f"Resolved deadlock by suggesting termination of {terminate}",
+                        "detail": str(deadlock) + " -> " + str(resolution)
+                    }
+                },
+                timeout=1.0
+            )
+        except Exception as e:
+            _log.warning("Failed to anchor deadlock resolution to L0 SSB", exc_info=e)
+
+        return resolution
 
     # ── Checkpoint Management ──
 

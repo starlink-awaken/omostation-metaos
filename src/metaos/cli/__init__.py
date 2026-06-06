@@ -194,6 +194,9 @@ def main(argv: list[str] | None = None) -> int:
     p_review.add_argument("expected", help="预期结果")
     p_review.add_argument("actual", help="实际结果")
 
+    p_run = sub.add_parser("run", help="运行 YAML 定义的工作流")
+    p_run.add_argument("file", help="YAML 工作流定义文件路径")
+
     sub.add_parser("ssot-scan", help="SSOT 覆盖扫描")
 
     args = parser.parse_args(argv if argv else None)
@@ -202,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
-    from metaos.core.types import SEngine
+    from metaos.core.engine import SEngine  # 修复了原来的 type 错误
 
     engine = SEngine(data_dir=str(Path.home() / ".metaos" / "data"))
     cli = CLI(engine)
@@ -215,6 +218,14 @@ def main(argv: list[str] | None = None) -> int:
         cli.gate(args.decision)
     elif args.command == "review":
         cli.review(args.action, args.expected, args.actual)
+    elif args.command == "run":
+        from metaos.core.workflow_parser import WorkflowParser
+        try:
+            parser_engine = WorkflowParser(engine)
+            wf = parser_engine.parse_file(args.file)
+            wf.run()
+        except Exception as e:
+            print(f"❌ 工作流执行失败: {e}")
     elif args.command == "ssot-scan":
         cli.ssot_scan()
 
