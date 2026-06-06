@@ -90,21 +90,44 @@ class Workflow:
                 task_input = node.input_prompt + context
                 task = Task(task_id=f"{self.workflow_id}_{node.node_id}", h_id="metaos", task_type=node.task_type, input=task_input)
                 
-                # 触发 S 引擎处理
-                result = self.engine.process(task)
-                
-                if result.get("status") == "completed" or result.get("status") == "logged":
-                    node.output = result.get("output", "")
-                    node.status = "completed"
-                    logger.info(f"Node {node.node_id} completed.")
-                    self._publish_event(node)
-                elif result.get("status") == "pending_h":
-                    logger.warning(f"Node {node.node_id} hit RED light, waiting for Human.")
-                    node.status = "failed" # 对于全自动编排，需要人工介入等于中断
-                    self._publish_event(node)
-                    return
+                # 触发 S 引擎处理（MVP版本先尝试调用Cockpit CLI执行真实任务，降级走SEngine）
+                if node.task_type == "research":
+                    logger.info(f"Delegating node {node.node_id} to Cockpit Research Agent...")
+                    import subprocess
+                    try:
+                        # 假设使用 cockpit research 执行
+                        res = subprocess.run(
+                            ["uv", "run", "--directory", "projects/cockpit", "cockpit", "research", task_input],
+                            capture_output=True, text=True, check=False
+                        )
+                        if res.returncode == 0:
+                            node.output = res.stdout
+                            node.status = "completed"
+                            self._publish_event(node)
+                        else:
+                            node.output = res.stderr
+                            node.status = "failed"
+                            self._publish_event(node)
+                    except Exception as e:
+                        logger.error(f"Failed to delegate to Cockpit: {e}")
+                        node.status = "failed"
+                        self._publish_event(node)
+                    continue
                 else:
-                    logger.error(f"Node {node.node_id} failed: {result}")
-                    node.status = "failed"
-                    self._publish_event(node)
-                    return
+                    result = self.engine.process(task)
+                    
+                    if result.get("status") == "completed" or result.get("status") == "logged":
+                        node.output = result.get("output", "")
+                        node.status = "completed"
+                        logger.info(f"Node {node.node_id} completed via SEngine.")
+                        self._publish_event(node)
+                    elif result.get("status") == "pending_h":
+                        logger.warning(f"Node {node.node_id} hit RED light, waiting for Human.")
+                        node.status = "failed" # 对于全自动编排，需要人工介入等于中断
+                        self._publish_event(node)
+                        return
+                    else:
+                        logger.error(f"Node {node.node_id} failed: {result}")
+                        node.status = "failed"
+                        self._publish_event(node)
+                        return
