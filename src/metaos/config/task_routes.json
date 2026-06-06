@@ -1,0 +1,11 @@
+{
+  "default": ["general"],
+  "reasoning": ["reasoning", "general"],
+  "code_gen": ["code", "general"],
+  "domain_analysis": ["general"],
+  "multimodal": ["general"],
+  "info_retrieval": ["general"],
+  "morning_ritual": ["general"],
+  "evening_review": ["general"],
+  "micro_review": ["reasoning", "general"]
+}

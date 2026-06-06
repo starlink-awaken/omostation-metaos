@@ -1,0 +1,52 @@
+# MetaOS 定价配置 — v1.0
+# 遵循资源统一定价模型 (Resource Pricing Model)
+# MetaOS 是系统级编排层，成本主要来自进程调度与系统资源占用
+#
+# 协议引用:
+#   - 宪法/constraints.md §R7
+#   - arcnode: validate-R-resource-pricing
+
+schema_version: "1.0"
+project: "MetaOS"
+description: "系统级编排引擎 — 进程调度与 MCP bridge 资源定价"
+
+tiers:
+  free:
+    process_slots: 5
+    mcp_bridge_connections: 2
+    max_concurrent_operations: 3
+    pipeline_runs_per_day: 30
+    budget_daily: 0.10
+    budget_monthly: 3.00
+    features:
+      - "basic_orchestration"
+      - "single_mcp_bridge"
+
+  pro:
+    process_slots: 20
+    mcp_bridge_connections: 10
+    max_concurrent_operations: 10
+    pipeline_runs_per_day: 500
+    budget_daily: 0.50
+    budget_monthly: 15.00
+    features:
+      - "parallel_processes"
+      - "multi_mcp_bridge"
+      - "operation_history"
+
+  enterprise:
+    process_slots: 100
+    mcp_bridge_connections: 50
+    max_concurrent_operations: 50
+    pipeline_runs_per_day: 5000
+    budget_daily: 2.00
+    budget_monthly: 60.00
+    features:
+      - "all"
+      - "infrastructure_as_code"
+      - "custom_bridge_adapters"
+
+resource_accounting:
+  token_tracking: "none"
+  execution_time_tracking: "wall_clock"
+  budget_scope: "system"

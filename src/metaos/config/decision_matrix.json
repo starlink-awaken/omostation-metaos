@@ -1,0 +1,13 @@
+{
+  "red_keywords": [
+    "价值观", "原则修订", "资源承诺", "他人权益",
+    "体系规则", "权限", "红灯区",
+    "principle", "value", "commitment", "rights"
+  ],
+  "yellow_keywords": [
+    "推荐", "方案", "建议", "经验", "框架",
+    "recommend", "propose", "suggest"
+  ],
+  "red_only_increase": true,
+  "yellow_deadline_hours": 24
+}

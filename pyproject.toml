@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "metaos"
+version = "0.1.0"
+description = "MetaOS — 编排/治理层: 决策门控、免疫监控、路由、数字资产引擎"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [
+    { name = "Workspace Team" },
+]
+keywords = ["orchestration", "governance", "decision-gate", "immune", "router"]
+
+dependencies = [
+    "fastmcp>=0.5.0",
+    "structlog>=0.20",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]
+
+[project.scripts]
+metaos = "metaos.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/metaos"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "S", "PLE", "RUF100"]
+ignore = ["S101", "S603", "S607", "S108", "S110", "S314", "S608", "E402", "E501", "SIM115", "N813", "UP047"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[dependency-groups]
+dev = [
+    "requests>=2.34.2",
+]
