@@ -36,6 +36,22 @@ default_template:
     depends_on: [understand]
 
 task_patterns:
+  - keywords: ["深度研究", "全面调研", "deep research", "并发调研", "高并发", "研报"]
+    template:
+      - id: gather_web
+        type: research
+        prompt: "在全网搜索并整理关于此主题的最新公开资讯和技术动态：{task}"
+      - id: gather_academic
+        type: info_retrieval
+        prompt: "在学术或专业领域检索相关的论文、深度分析或官方标准：{task}"
+      - id: gather_internal
+        type: info_retrieval
+        prompt: "从本地知识库 (Cards/Memory) 中检索与此相关的历史积累和背景：{task}"
+      - id: synthesize
+        type: reasoning
+        prompt: "你现在收到了来自全网资讯、学术文献和本地知识库的三份数据。请将它们交叉验证并汇总，生成一份具有深度洞察的综合研报。任务背景：{task}"
+        depends_on: [gather_web, gather_academic, gather_internal]
+
   - keywords: ["研究", "research", "调研", "了解", "分析"]
     template:
       - id: gather

@@ -172,8 +172,8 @@ class WorkflowPlanner:
             except json.JSONDecodeError:
                 pass
 
-        # 4. 找第一个完整的 { ... } 块
-        match = re.search(r"\{[\s\S]+\}", text)
+        # 4. 找最外层的 { ... } 块 (非贪婪或从头到尾匹配最后一个})
+        match = re.search(r"\{[\s\S]*\}", text)
         if match:
             try:
                 return json.loads(match.group(0))
