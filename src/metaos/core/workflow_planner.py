@@ -93,8 +93,13 @@ class WorkflowPlanner:
 
             # Load L4 CARDS context for alignment
             from metaos.core.cards_context import get_cards_context
+            from metaos.core.cognitive_framework import CognitiveFrameworkLoader
+            
             l4_context = get_cards_context()
-            system_prompt = PLANNER_SYSTEM_PROMPT + l4_context
+            loader = CognitiveFrameworkLoader()
+            cognitive_prompt = loader.build_cognitive_prompt(task)
+            
+            system_prompt = PLANNER_SYSTEM_PROMPT + l4_context + cognitive_prompt
 
             print(f"   🤖 调用 LLM ({model}) 生成规划...")
             r = requests.post(
