@@ -197,6 +197,11 @@ def main(argv: list[str] | None = None) -> int:
     p_run = sub.add_parser("run", help="运行 YAML 定义的工作流")
     p_run.add_argument("file", help="YAML 工作流定义文件路径")
 
+    p_plan = sub.add_parser("plan", help="🧠 动态规划并执行工作流（自然语言任务 → DAG → 执行）")
+    p_plan.add_argument("task", help="任务描述（自然语言）")
+    p_plan.add_argument("--dry-run", action="store_true", help="仅生成规划，不执行")
+    p_plan.add_argument("--no-llm", action="store_true", help="跳过 LLM，强制使用启发式模板")
+
     sub.add_parser("ssot-scan", help="SSOT 覆盖扫描")
 
     args = parser.parse_args(argv if argv else None)
@@ -238,6 +243,39 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"       → {node.output[:120]}...")
         except Exception as e:
             print(f"❌ 工作流执行失败: {e}")
+    elif args.command == "plan":
+        from metaos.core.workflow_planner import WorkflowPlanner
+        try:
+            token = engine.register_h("metaos_system", "MetaOS Planner")
+            engine.authenticate(token)
+
+            planner = WorkflowPlanner(engine, use_llm=not args.no_llm)
+            wf = planner.plan(args.task)
+
+            # 展示生成的规划
+            print(f"\n📋 生成的工作流规划: [{wf.workflow_id}]")
+            print(f"{'─' * 50}")
+            for i, (nid, node) in enumerate(wf.nodes.items()):
+                deps = " ← " + ", ".join(node.depends_on) if node.depends_on else ""
+                print(f"  {i+1}. [{node.task_type}] {nid}{deps}")
+                print(f"     {node.input_prompt[:80]}...")
+
+            if args.dry_run:
+                print("\n⏸  --dry-run 模式: 规划已生成，跳过执行")
+                return 0
+
+            print(f"\n⚙️  开始执行 {len(wf.nodes)} 个节点...")
+            wf.run()
+
+            print("\n🏁 工作流执行报告:")
+            for nid, node in wf.nodes.items():
+                icon = "✅" if node.status == "completed" else "❌"
+                print(f"  {icon} [{nid}] {node.status}")
+                if node.output and node.status == "completed":
+                    print(f"       → {node.output[:150]}...")
+        except Exception as e:
+            print(f"❌ 动态规划失败: {e}")
+            import traceback; traceback.print_exc()
     elif args.command == "ssot-scan":
         cli.ssot_scan()
 
