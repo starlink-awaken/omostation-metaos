@@ -54,16 +54,18 @@ class TestWorkflow:
         wf.add_node(WorkflowNode(node_id="n1", task_type="reasoning", input_prompt="test"))
         assert "n1" in wf.nodes
 
-    def test_run_sequential_dag(self, simple_workflow, mock_engine):
+    @pytest.mark.asyncio
+    async def test_run_sequential_dag(self, simple_workflow, mock_engine):
         """Steps execute in topological order."""
         with patch.object(simple_workflow, '_publish_event'):
-            simple_workflow.run()
+            await simple_workflow.run()
         
         assert simple_workflow.nodes["step1"].status == "completed"
         assert simple_workflow.nodes["step2"].status == "completed"
         assert mock_engine.process.call_count == 2
 
-    def test_dependency_respected(self, simple_workflow, mock_engine):
+    @pytest.mark.asyncio
+    async def test_dependency_respected(self, simple_workflow, mock_engine):
         """step2 should only run after step1 is done."""
         call_order = []
         def track_call(task):
@@ -74,11 +76,12 @@ class TestWorkflow:
 
         mock_engine.process.side_effect = track_call
         with patch.object(simple_workflow, '_publish_event'):
-            simple_workflow.run()
+            await simple_workflow.run()
 
         assert call_order == ["step1", "step2"]
 
-    def test_failed_node_stops_workflow(self, mock_engine):
+    @pytest.mark.asyncio
+    async def test_failed_node_stops_workflow(self, mock_engine):
         """If a node fails, the workflow should stop."""
         mock_engine.process.return_value = {"status": "failed", "output": "error"}
         wf = Workflow(workflow_id="fail_wf", engine=mock_engine)
@@ -86,12 +89,13 @@ class TestWorkflow:
         wf.add_node(WorkflowNode(node_id="n2", task_type="reasoning", input_prompt="never run", depends_on=["n1"]))
         
         with patch.object(wf, '_publish_event'):
-            wf.run()
+            await wf.run()
 
         assert wf.nodes["n1"].status == "failed"
-        assert wf.nodes["n2"].status == "pending"  # never ran
+        assert wf.nodes["n2"].status == "failed"  # cascaded failure
 
-    def test_red_light_stops_workflow(self, mock_engine):
+    @pytest.mark.asyncio
+    async def test_red_light_stops_workflow(self, mock_engine):
         """RED gate decision should halt the workflow."""
         mock_engine.process.return_value = {"status": "pending_h", "level": "red"}
         wf = Workflow(workflow_id="red_wf", engine=mock_engine)
@@ -100,11 +104,12 @@ class TestWorkflow:
 
         with patch.object(wf, '_publish_event'):
             with patch.object(wf, '_publish_human_approval_event'):
-                wf.run()
+                await wf.run()
 
         assert wf.nodes["n1"].status == "awaiting_approval"  # human-in-the-loop, not failed
 
-    def test_upstream_output_injected_into_downstream(self, mock_engine):
+    @pytest.mark.asyncio
+    async def test_upstream_output_injected_into_downstream(self, mock_engine):
         """Downstream nodes receive upstream output in their prompt."""
         mock_engine.process.return_value = {"status": "completed", "output": "upstream result"}
         wf = Workflow(workflow_id="ctx_wf", engine=mock_engine)
@@ -113,7 +118,7 @@ class TestWorkflow:
 
         with patch.object(wf, '_publish_event'):
             with patch.object(wf, '_publish_human_approval_event'):
-                wf.run()
+                await wf.run()
 
         # The second call's input should contain upstream output
         second_call_task = mock_engine.process.call_args_list[1][0][0]

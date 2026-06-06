@@ -1,4 +1,5 @@
 import sys
+import asyncio
 from pathlib import Path
 import logging
 
@@ -10,7 +11,7 @@ from metaos.core.workflow import Workflow, WorkflowNode
 
 logging.basicConfig(level=logging.INFO)
 
-def run_test_workflow():
+async def run_test_workflow():
     print("🚀 Initializing SEngine...")
     engine = SEngine()
     
@@ -45,7 +46,7 @@ def run_test_workflow():
     ))
     
     print("⚙️ Executing Workflow...")
-    wf.run()
+    await wf.run()
     
     print("\n🏁 Workflow Execution Results:")
     for node_id, node in wf.nodes.items():
@@ -54,4 +55,4 @@ def run_test_workflow():
             print(f"  -> {node.output[:100]}...\n")
 
 if __name__ == "__main__":
-    run_test_workflow()
+    asyncio.run(run_test_workflow())

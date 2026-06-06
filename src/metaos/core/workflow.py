@@ -12,6 +12,7 @@ import logging
 import subprocess
 import threading
 import time
+import asyncio
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -57,55 +58,73 @@ class Workflow:
 
     # ── Main Execution Loop ────────────────────────────────────────────────
 
-    def run(self, task_description: str = "", dag_dict: dict | None = None):
+    async def run(self, task_description: str = "", dag_dict: dict | None = None):
         """执行工作流 DAG。集成持久化/并行/重试/超时/人工介入。"""
+        import asyncio
         logger.info(f"Starting workflow {self.workflow_id} with {len(self.nodes)} nodes.")
 
         # Gap #1: 持久化工作流启动状态
         _store.save_workflow(self.workflow_id, task_description, dag_dict or {})
 
+        stop_event = asyncio.Event()
+        node_tasks: Dict[str, asyncio.Task] = {}
+        
         while True:
-            executable = self._get_executable_nodes()
-            if not executable:
-                pending = [n for n in self.nodes.values() if n.status == "pending"]
-                running = [n for n in self.nodes.values() if n.status == "running"]
-                if not pending and not running:
-                    logger.info("Workflow completed successfully.")
-                    _store.complete_workflow(self.workflow_id, "completed")
-                    break
-                elif not running and pending:
-                    logger.error("Workflow deadlocked. Unresolved dependencies.")
-                    _store.complete_workflow(self.workflow_id, "deadlocked")
-                    break
-                else:
-                    time.sleep(0.5)
-                    continue
-
-            # Gap #4: 并行执行所有当前可执行节点
-            threads = []
-            stop_event = threading.Event()
-
-            for node in executable:
-                node.status = "running"
-                t = threading.Thread(
-                    target=self._execute_node,
-                    args=(node, stop_event),
-                    daemon=True
-                )
-                threads.append(t)
-                t.start()
-
-            for t in threads:
-                t.join()
-
             if stop_event.is_set():
                 _store.complete_workflow(self.workflow_id, "stopped")
+                if node_tasks:
+                    await asyncio.gather(*node_tasks.values(), return_exceptions=True)
                 return
+
+            executable = self._get_executable_nodes()
+            pending = [n for n in self.nodes.values() if n.status == "pending"]
+            running = [n for n in self.nodes.values() if n.status == "running"]
+            
+            if not pending and not running and not executable:
+                logger.info("Workflow completed successfully.")
+                _store.complete_workflow(self.workflow_id, "completed")
+                break
+            elif not running and pending and not executable:
+                logger.error("Workflow deadlocked or cascaded failure. Unresolved dependencies.")
+                _store.complete_workflow(self.workflow_id, "deadlocked")
+                break
+
+            # Gap #4: 并发执行所有当前可执行节点
+            for node in executable:
+                node.status = "running"
+                task = asyncio.create_task(self._execute_node(node, stop_event))
+                node_tasks[node.node_id] = task
+
+            if node_tasks:
+                done, _ = await asyncio.wait(
+                    node_tasks.values(), return_when=asyncio.FIRST_COMPLETED
+                )
+                for t in done:
+                    # Remove finished task from tracking map
+                    for nid, ntask in list(node_tasks.items()):
+                        if ntask == t:
+                            del node_tasks[nid]
+                            # Cascade failure if needed
+                            if self.nodes[nid].status in ("failed", "timed_out"):
+                                logger.error(f"Node {nid} failed. Cascading failure to dependents.")
+                                self._cascade_fail(nid)
+            else:
+                await asyncio.sleep(0.5)
+
+    def _cascade_fail(self, failed_node_id: str):
+        """级联失败所有依赖此节点的下游节点"""
+        for node in self.nodes.values():
+            if node.status == "pending" and failed_node_id in node.depends_on:
+                node.status = "failed"
+                node.output = f"Upstream node {failed_node_id} failed."
+                self._publish_event(node)
+                self._cascade_fail(node.node_id)
 
     # ── Node Execution ─────────────────────────────────────────────────────
 
-    def _execute_node(self, node: WorkflowNode, stop_event: threading.Event):
-        """在独立线程中执行单个节点，支持重试和超时。"""
+    async def _execute_node(self, node: WorkflowNode, stop_event: asyncio.Event):
+        """在独立 Task 中执行单个节点，支持重试和超时。"""
+        import asyncio
         context = ""
         if node.depends_on:
             context = "\n【上游依赖结果】\n"
@@ -122,14 +141,17 @@ class Workflow:
 
         # Gap #8: 重试循环（指数退避）
         while node.retry_count <= node.max_retries:
-            success = self._try_execute(node, task, task_input, stop_event)
+            if stop_event.is_set():
+                break
+            success = await self._try_execute(node, task, task_input, stop_event)
             if success or stop_event.is_set():
                 break
+            
             node.retry_count += 1
             if node.retry_count <= node.max_retries:
                 wait = 2 ** node.retry_count
                 logger.warning(f"Node {node.node_id} retry {node.retry_count}/{node.max_retries} in {wait}s")
-                time.sleep(wait)
+                await asyncio.sleep(wait)
 
         # Gap #1: checkpoint 写入 DB
         _store.update_node(
@@ -137,73 +159,77 @@ class Workflow:
             node.input_prompt, node.depends_on, node.status, node.output or ""
         )
 
-    def _try_execute(self, node: WorkflowNode, task: Task, task_input: str,
-                     stop_event: threading.Event) -> bool:
+    async def _try_execute(self, node: WorkflowNode, task: Task, task_input: str,
+                     stop_event: asyncio.Event) -> bool:
         """尝试执行节点一次，返回是否成功。"""
         if node.task_type == "research":
-            return self._execute_research(node, task_input)
+            return await self._execute_research(node, task_input)
         else:
-            return self._execute_engine(node, task, stop_event)
+            return await self._execute_engine(node, task, stop_event)
 
-    def _execute_research(self, node: WorkflowNode, task_input: str) -> bool:
+    async def _execute_research(self, node: WorkflowNode, task_input: str) -> bool:
         """委托给 Cockpit Research Agent 执行（含超时）"""
+        import asyncio
         logger.info(f"Delegating {node.node_id} to Cockpit Research Agent...")
-        result: dict = {"returncode": -1, "stdout": "", "stderr": ""}
-
-        def _run():
+        
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "uv", "run", "--directory", "projects/cockpit", "cockpit",
+                "research", task_input[:200],
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
             try:
-                r = subprocess.run(
-                    ["uv", "run", "--directory", "projects/cockpit", "cockpit",
-                     "research", task_input[:200]],
-                    capture_output=True, text=True, check=False,
-                    timeout=node.timeout_seconds
-                )
-                result.update({"returncode": r.returncode, "stdout": r.stdout, "stderr": r.stderr})
-            except subprocess.TimeoutExpired:
-                result["stderr"] = "subprocess timeout"
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=node.timeout_seconds)
+                returncode = proc.returncode
+            except asyncio.TimeoutError:
+                proc.kill()
+                node.status = "timed_out"
+                node.output = f"[超时] Cockpit research 超过 {node.timeout_seconds}s"
+                self._publish_event(node)
+                return False
+                
+            if returncode == 0:
+                node.output = stdout.decode('utf-8')
+                node.status = "completed"
+                self._publish_event(node)
+                return True
 
-        t = threading.Thread(target=_run, daemon=True)
-        t.start()
-        t.join(timeout=node.timeout_seconds + 5)
-
-        if t.is_alive() or result["returncode"] == -1:
-            # Gap #12: 超时
-            node.status = "timed_out"
-            node.output = f"[超时] Cockpit research 超过 {node.timeout_seconds}s"
+            node.output = stderr.decode('utf-8')
+            node.status = "failed"
+            self._publish_event(node)
+            return False
+            
+        except Exception as e:
+            node.output = f"Research subprocess failed: {e}"
+            node.status = "failed"
             self._publish_event(node)
             return False
 
-        if result["returncode"] == 0:
-            node.output = result["stdout"]
-            node.status = "completed"
-            self._publish_event(node)
-            return True
-
-        node.output = result["stderr"]
-        node.status = "failed"
-        self._publish_event(node)
-        return False
-
-    def _execute_engine(self, node: WorkflowNode, task: Task,
-                        stop_event: threading.Event) -> bool:
+    async def _execute_engine(self, node: WorkflowNode, task: Task,
+                        stop_event: asyncio.Event) -> bool:
         """通过 SEngine 执行节点（含超时和 RED 门控处理）"""
-        result_holder: list = [None]
-
-        def _call():
-            result_holder[0] = self.engine.process(task)
-
-        # Gap #12: 超时保护
-        t = threading.Thread(target=_call, daemon=True)
-        t.start()
-        t.join(timeout=node.timeout_seconds)
-
-        if t.is_alive():
+        import asyncio
+        
+        def _call_engine():
+            return self.engine.process(task)
+            
+        try:
+            # Use to_thread so SEngine.process doesn't block the async loop
+            result = await asyncio.wait_for(asyncio.to_thread(_call_engine), timeout=node.timeout_seconds)
+        except asyncio.TimeoutError:
             node.status = "timed_out"
             node.output = f"[超时] SEngine 超过 {node.timeout_seconds}s"
             self._publish_event(node)
             return False
+        except Exception as e:
+            node.status = "failed"
+            node.output = str(e)
+            self._publish_event(node)
+            return False
 
-        result = result_holder[0] or {}
+        result = result or {}
 
         if result.get("status") in ("completed", "logged"):
             node.output = result.get("output", "")
