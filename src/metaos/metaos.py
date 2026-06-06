@@ -85,7 +85,8 @@ def cmd_register(args):
     engine, cli = get_engine_and_cli(args.data_dir)
     token = engine.register_h(args.h_id, args.name or args.h_id)
     # 保存 token 到文件，下次自动使用
-    # ⚠️ 生产环境应使用加密存储（如 keyring / 加密文件）
+    # ⚠️ 当前为明文存储 (chmod 600)，开发环境可接受但生产需加密
+    # 建议: macOS → Keychain; Linux → keyring; 或加密文件 + 环境变量
     token_file = _get_token_file(args.data_dir)
     token_file.write_text(token)
     token_file.chmod(0o600)
