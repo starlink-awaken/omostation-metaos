@@ -37,7 +37,7 @@ def get_cards_context() -> str:
     # Fallback: direct file parsing
     cards_dir = Path.home() / "Documents" / "@驾驶舱" / "CARDS"
     if not cards_dir.exists():
-        cards_dir = Path.home() / "Documents" / "驾驶舱" / "CARDS"
+        cards_dir = Path.home() / "Documents" / "@驾驶舱" / "CARDS"
     if not cards_dir.exists():
         return ""
 
