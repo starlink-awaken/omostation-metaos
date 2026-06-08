@@ -1,19 +1,51 @@
-import json
 import logging
 from pathlib import Path
-import yaml
 
 logger = logging.getLogger(__name__)
 
+
 def get_cards_context() -> str:
-    """Reads L4 CARDS active goals/context to inject into agent prompts."""
-    cards_dir = Path.home() / "Documents" / "驾驶舱" / "CARDS"
+    """Reads L4 CARDS active goals/context to inject into agent prompts.
+
+    Uses l4-kernel CardsPlane if available, falls back to direct file parsing.
+    """
+    # Try l4-kernel first
+    try:
+        from l4_kernel import DomainRegistry
+        from l4_kernel.kems import CardsPlane
+
+        registry = DomainRegistry()
+        cockpit = registry.get("cockpit")
+        if cockpit and cockpit.exists():
+            cards = CardsPlane(cockpit.path)
+            all_cards = cards.scan_cards()
+            active_p0 = [
+                f"{c.get('title', c.get('id', ''))} (Status: {c.get('status', 'open')})"
+                for c in all_cards
+                if c.get("status") not in ("closed", "done") and c.get("priority") == "P0"
+            ]
+            if not active_p0:
+                return ""
+            context = "\n\n### L4 User Context (Active P0 CARDS)\n"
+            context += "Please align your planning with the user's current high-priority goals:\n"
+            for card in active_p0[:10]:
+                context += f"- {card}\n"
+            return context
+    except ImportError:
+        pass
+
+    # Fallback: direct file parsing
+    cards_dir = Path.home() / "Documents" / "@驾驶舱" / "CARDS"
+    if not cards_dir.exists():
+        cards_dir = Path.home() / "Documents" / "驾驶舱" / "CARDS"
     if not cards_dir.exists():
         return ""
-        
+
+    import yaml
+
     active_p0 = []
     try:
-        for f in cards_dir.glob("*.md"):
+        for f in cards_dir.rglob("*.md"):
             try:
                 content = f.read_text(encoding="utf-8")
                 if content.startswith("---"):
@@ -28,10 +60,10 @@ def get_cards_context() -> str:
     except Exception as e:
         logger.warning(f"Failed to read CARDS: {e}")
         return ""
-        
+
     if not active_p0:
         return ""
-        
+
     context = "\n\n### L4 User Context (Active P0 CARDS)\n"
     context += "Please align your planning with the user's current high-priority goals:\n"
     for card in active_p0[:10]:
