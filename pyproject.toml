@@ -18,6 +18,7 @@ dependencies = [
     "fastmcp>=0.5.0",
     "pyyaml>=6.0.3",
     "structlog>=0.20",
+    "agora",
 ]
 
 [project.optional-dependencies]
@@ -40,6 +41,9 @@ pythonpath = ["src"]
 [tool.ruff]
 target-version = "py313"
 line-length = 120
+
+[tool.uv.sources]
+agora = { path = "../agora", editable = true }
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "S", "PLE", "RUF100"]
