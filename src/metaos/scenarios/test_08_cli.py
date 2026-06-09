@@ -1,7 +1,5 @@
 """场景08：CLI 接口测试"""
 
-
-
 from metaos.core.engine import SEngine  # type: ignore[import-not-found]
 
 

@@ -1,7 +1,5 @@
 """场景02：免疫机制测试——提醒→冻结→熔断"""
 
-
-
 from metaos.core.engine import SEngine  # type: ignore[import-not-found]
 from metaos.core.types import Decision, Task  # type: ignore[import-not-found]
 

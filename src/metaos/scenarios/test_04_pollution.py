@@ -1,7 +1,5 @@
 """场景04：资产污染——D_融合 错误发现 + 追踪 + 降级"""
 
-
-
 from metaos.core.engine import SEngine  # type: ignore[import-not-found]
 from metaos.core.types import AssetLevel, Decision, DigitalAsset  # type: ignore[import-not-found]
 

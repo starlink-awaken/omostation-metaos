@@ -1,7 +1,5 @@
 """场景03：基础设施故障——M 全量宕机 + 离线恢复"""
 
-
-
 from metaos.core.engine import SEngine  # type: ignore[import-not-found]
 from metaos.core.types import Task  # type: ignore[import-not-found]
 

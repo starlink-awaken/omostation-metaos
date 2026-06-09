@@ -1,7 +1,8 @@
-import yaml
 import logging
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
+
+import yaml
 
 from metaos.core.engine import SEngine
 from metaos.core.workflow import Workflow, WorkflowNode
@@ -20,31 +21,31 @@ class WorkflowParser:
         if not path.exists():
             raise FileNotFoundError(f"Workflow file not found: {path}")
 
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         return self.parse_dict(data)
 
-    def parse_dict(self, data: Dict[str, Any]) -> Workflow:
+    def parse_dict(self, data: dict[str, Any]) -> Workflow:
         """Parse a dictionary into a Workflow."""
         if "workflow_id" not in data:
             raise ValueError("Missing 'workflow_id' in definition.")
-            
+
         workflow_id = data["workflow_id"]
         logger.info(f"Parsing workflow: {workflow_id} ({data.get('name', 'Unnamed')})")
-        
+
         workflow = Workflow(workflow_id=workflow_id, engine=self.engine)
-        
+
         nodes = data.get("nodes", [])
         for n in nodes:
             node_id = n.get("id")
             if not node_id:
                 raise ValueError(f"Node missing 'id': {n}")
-                
+
             task_type = n.get("type", "general")
             prompt = n.get("prompt", "")
             depends_on = n.get("depends_on", [])
-            
+
             node = WorkflowNode(
                 node_id=node_id,
                 task_type=task_type,
@@ -52,10 +53,10 @@ class WorkflowParser:
                 depends_on=depends_on
             )
             workflow.add_node(node)
-            
+
         # 校验环依赖等图结构（TODO: 暂时简单实现）
         self._validate_dag(workflow)
-        
+
         return workflow
 
     def _validate_dag(self, workflow: Workflow):

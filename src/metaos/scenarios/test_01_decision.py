@@ -1,7 +1,5 @@
 """场景01：职业决策——红灯区 + 原则冲突 + 元认知"""
 
-
-
 from metaos.cli import CLI  # type: ignore[import-not-found]
 from metaos.core.engine import SEngine  # type: ignore[import-not-found]
 from metaos.core.types import Decision, Principle, Task  # type: ignore[import-not-found]

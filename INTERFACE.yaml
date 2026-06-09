@@ -6,7 +6,7 @@ description: 编排引擎 (决策门控/免疫监控/路由)
 cli:
   - name: metaos
     module: metaos.cli:main
-    description: 5 子命令 (status/trace/gate/review/ssot-scan)
+    description: 12 子命令 (status/trace/gate/review/ssot-scan/...)
 
 mcp:
   server: metaos.mcp_server
@@ -19,4 +19,4 @@ dependencies:
   runtime: [fastmcp, structlog]
   dev: [pytest, pytest-asyncio, ruff]
 
-tests: 163
+tests: 189

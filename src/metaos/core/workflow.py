@@ -8,18 +8,15 @@
 - Gap #12: 每节点独立超时保护
 """
 
-import logging
-import subprocess
-import threading
-import time
 import asyncio
+import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+
+import requests
 
 from metaos.core.engine import SEngine
 from metaos.core.types import Task
 from metaos.core.workflow_store import WorkflowStore
-import requests
 
 logger = logging.getLogger("metaos.workflow")
 
@@ -31,8 +28,8 @@ class WorkflowNode:
     node_id: str
     task_type: str
     input_prompt: str
-    depends_on: List[str] = field(default_factory=list)
-    output: Optional[str] = None
+    depends_on: list[str] = field(default_factory=list)
+    output: str | None = None
     status: str = "pending"          # pending | running | completed | failed | timed_out | awaiting_approval
     max_retries: int = 1             # Gap #8: 最大重试次数
     retry_count: int = 0
@@ -43,12 +40,12 @@ class Workflow:
     def __init__(self, workflow_id: str, engine: SEngine):
         self.workflow_id = workflow_id
         self.engine = engine
-        self.nodes: Dict[str, WorkflowNode] = {}
+        self.nodes: dict[str, WorkflowNode] = {}
 
     def add_node(self, node: WorkflowNode):
         self.nodes[node.node_id] = node
 
-    def _get_executable_nodes(self) -> List[WorkflowNode]:
+    def _get_executable_nodes(self) -> list[WorkflowNode]:
         """返回所有依赖已满足且状态为 pending 的节点"""
         return [
             node for node in self.nodes.values()
@@ -67,8 +64,8 @@ class Workflow:
         _store.save_workflow(self.workflow_id, task_description, dag_dict or {})
 
         stop_event = asyncio.Event()
-        node_tasks: Dict[str, asyncio.Task] = {}
-        
+        node_tasks: dict[str, asyncio.Task] = {}
+
         while True:
             if stop_event.is_set():
                 _store.complete_workflow(self.workflow_id, "stopped")
@@ -79,7 +76,7 @@ class Workflow:
             executable = self._get_executable_nodes()
             pending = [n for n in self.nodes.values() if n.status == "pending"]
             running = [n for n in self.nodes.values() if n.status == "running"]
-            
+
             if not pending and not running and not executable:
                 logger.info("Workflow completed successfully.")
                 _store.complete_workflow(self.workflow_id, "completed")
@@ -146,7 +143,7 @@ class Workflow:
             success = await self._try_execute(node, task, task_input, stop_event)
             if success or stop_event.is_set():
                 break
-            
+
             node.retry_count += 1
             if node.retry_count <= node.max_retries:
                 wait = 2 ** node.retry_count
@@ -171,7 +168,7 @@ class Workflow:
         """委托给 Cockpit Research Agent 执行（含超时）"""
         import asyncio
         logger.info(f"Delegating {node.node_id} to Cockpit Research Agent...")
-        
+
         try:
             proc = await asyncio.create_subprocess_exec(
                 "uv", "run", "--directory", "projects/cockpit", "cockpit",
@@ -179,17 +176,17 @@ class Workflow:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            
+
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=node.timeout_seconds)
                 returncode = proc.returncode
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 proc.kill()
                 node.status = "timed_out"
                 node.output = f"[超时] Cockpit research 超过 {node.timeout_seconds}s"
                 self._publish_event(node)
                 return False
-                
+
             if returncode == 0:
                 node.output = stdout.decode('utf-8')
                 node.status = "completed"
@@ -200,7 +197,7 @@ class Workflow:
             node.status = "failed"
             self._publish_event(node)
             return False
-            
+
         except Exception as e:
             node.output = f"Research subprocess failed: {e}"
             node.status = "failed"
@@ -211,14 +208,14 @@ class Workflow:
                         stop_event: asyncio.Event) -> bool:
         """通过 SEngine 执行节点（含超时和 RED 门控处理）"""
         import asyncio
-        
+
         def _call_engine():
             return self.engine.process(task)
-            
+
         try:
             # Use to_thread so SEngine.process doesn't block the async loop
             result = await asyncio.wait_for(asyncio.to_thread(_call_engine), timeout=node.timeout_seconds)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             node.status = "timed_out"
             node.output = f"[超时] SEngine 超过 {node.timeout_seconds}s"
             self._publish_event(node)

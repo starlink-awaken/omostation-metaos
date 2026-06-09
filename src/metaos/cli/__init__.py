@@ -2,9 +2,10 @@
 
 import json
 import os
-import yaml
 from datetime import datetime
 from pathlib import Path
+
+import yaml
 
 from metaos.core.engine import SEngine  # type: ignore[import-not-found]
 from metaos.core.types import Principle, Task, TaskType  # type: ignore[import-not-found]
@@ -249,12 +250,12 @@ def main(argv: list[str] | None = None) -> int:
             # 系统级自动鉴权（Workflow 以 metaos_system 身份运行）
             token = engine.register_h("metaos_system", "MetaOS Workflow Runner")
             engine.authenticate(token)
-            
+
             parser_engine = WorkflowParser(engine)
             wf = parser_engine.parse_file(args.file)
             print(f"\n🚀 启动工作流: {wf.workflow_id} ({len(wf.nodes)} 节点)")
             wf.run()
-            
+
             print("\n🏁 工作流执行报告:")
             for nid, node in wf.nodes.items():
                 icon = "✅" if node.status == "completed" else "❌"
@@ -302,7 +303,8 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"       ⚠️  需人工审批: metaos approve {wf.workflow_id}")
         except Exception as e:
             print(f"❌ 动态规划失败: {e}")
-            import traceback; traceback.print_exc()
+            import traceback
+            traceback.print_exc()
     elif args.command == "history":
         from metaos.core.workflow_store import WorkflowStore
         store = WorkflowStore()
@@ -314,7 +316,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"\n📋 工作流详情: [{wf_detail['id']}]")
                 print(f"   任务: {wf_detail['task']}")
                 print(f"   状态: {wf_detail['status']}  创建: {wf_detail['created']}")
-                print(f"\n   节点执行记录:")
+                print("\n   节点执行记录:")
                 for n in wf_detail["nodes"]:
                     icon = "✅" if n["status"] == "completed" else "❌"
                     print(f"   {icon} [{n['id']}] {n['status']}")

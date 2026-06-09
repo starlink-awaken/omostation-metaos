@@ -23,12 +23,14 @@ logger = logging.getLogger("metaos.workflow_planner")
 
 
 from pathlib import Path
+
 import yaml
+
 
 def _load_templates():
     template_path = Path(__file__).parent.parent / "templates" / "workflow_planner.yaml"
     try:
-        with open(template_path, "r", encoding="utf-8") as f:
+        with open(template_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
             return (
                 data.get("task_patterns", []),
@@ -54,15 +56,15 @@ class WorkflowPlanner:
     def plan(self, task: str, auto_run: bool = False) -> Workflow:
         """
         根据任务描述生成工作流。
-        
+
         Args:
             task: 自然语言任务描述
             auto_run: 是否生成后立即执行
-            
+
         Returns:
             一个已配置好的 Workflow 对象
         """
-        print(f"\n🧠 MetaOS Planner 分析任务中...")
+        print("\n🧠 MetaOS Planner 分析任务中...")
         print(f"   任务: {task[:80]}")
 
         dag_dict = None
@@ -94,11 +96,11 @@ class WorkflowPlanner:
             # Load L4 CARDS context for alignment
             from metaos.core.cards_context import get_cards_context
             from metaos.core.cognitive_framework import CognitiveFrameworkLoader
-            
+
             l4_context = get_cards_context()
             loader = CognitiveFrameworkLoader()
             cognitive_prompt = loader.build_cognitive_prompt(task)
-            
+
             system_prompt = PLANNER_SYSTEM_PROMPT + l4_context + cognitive_prompt
 
             print(f"   🤖 调用 LLM ({model}) 生成规划...")

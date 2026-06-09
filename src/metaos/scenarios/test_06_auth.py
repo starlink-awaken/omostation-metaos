@@ -1,7 +1,5 @@
 """场景06：认证系统测试——register_h + authenticate + 权限隔离"""
 
-
-
 from metaos.core.engine import SEngine  # type: ignore[import-not-found]
 from metaos.core.types import Task  # type: ignore[import-not-found]
 

@@ -102,6 +102,7 @@ class L2Controller:
             # 强制将重大决断写入 L0 SSB Immutable Log (X1 侧链锚定)
             try:
                 import httpx
+
                 httpx.post(
                     "http://127.0.0.1:8080/v1/tools/call",
                     json={
@@ -110,10 +111,10 @@ class L2Controller:
                             "event_type": "L2_CIRCUIT_BREAK",
                             "agent_name": "metaos.l2_controller",
                             "summary": f"L2 Controller shifted {service} to {zone} zone",
-                            "detail": f"New concurrency: {new_concurrency}, latency: {latency_ms}ms"
-                        }
+                            "detail": f"New concurrency: {new_concurrency}, latency: {latency_ms}ms",
+                        },
                     },
-                    timeout=1.0
+                    timeout=1.0,
                 )
             except Exception as e:
                 _log.warning("Failed to anchor L2 circuit breaking to L0 SSB", exc_info=e)

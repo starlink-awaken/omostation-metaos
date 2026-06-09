@@ -10,7 +10,6 @@ import json
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 DEFAULT_DB_PATH = Path.home() / ".metaos" / "workflow_history.db"
 
@@ -91,7 +90,7 @@ class WorkflowStore:
             for r in rows
         ]
 
-    def get_workflow(self, workflow_id: str) -> Optional[dict]:
+    def get_workflow(self, workflow_id: str) -> dict | None:
         """获取单个工作流详情"""
         with self._conn() as conn:
             row = conn.execute(

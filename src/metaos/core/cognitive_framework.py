@@ -1,7 +1,7 @@
-import os
-import yaml
-from pathlib import Path
 import logging
+from pathlib import Path
+
+import yaml
 
 logger = logging.getLogger("metaos.cognitive")
 
@@ -18,10 +18,10 @@ class CognitiveFrameworkLoader:
     def _load_all(self):
         if not self.m1_dir.exists():
             return
-            
+
         for filepath in self.m1_dir.glob("*.yaml"):
             try:
-                with open(filepath, "r", encoding="utf-8") as f:
+                with open(filepath, encoding="utf-8") as f:
                     fw = yaml.safe_load(f)
                     if fw and fw.get("m1_type") == "CognitiveFramework":
                         self.frameworks.append(fw)
@@ -49,7 +49,7 @@ class CognitiveFrameworkLoader:
         applicable = self.get_applicable_frameworks(task_context)
         if not applicable:
             return ""
-            
+
         prompt = "\n\n# 【强制约束】当前任务已触发动态加载的思维框架：\n"
         for fw in applicable:
             props = fw.get("properties", {})
@@ -59,5 +59,5 @@ class CognitiveFrameworkLoader:
             prompt += "你必须依次运用以下角色视角进行系统性思考与方案验证：\n"
             for p in props.get("personas", []):
                 prompt += f"- {p.get('icon', '')} {p.get('role', 'Unknown')}: {p.get('focus', '')}\n"
-                
+
         return prompt
