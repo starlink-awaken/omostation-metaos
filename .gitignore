@@ -1,20 +1,55 @@
-# Python
+# ── Python ──
 __pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
-.venv/
-.ruff_cache/
-.pytest_cache/
-*.egg
+.eggs/
 dist/
 build/
+*.egg
 
-# IDE
-.vscode/
+# ── Virtual environment ──
+.venv/
+venv/
+.venv.bak/
+
+# ── uv ──
+uv.lock
+
+# ── IDE ──
 .idea/
+.vscode/
 *.swp
 *.swo
+*~
 
-# OS
+# ── OS ──
 .DS_Store
 Thumbs.db
+
+# ── Environment & Secrets ──
+.env
+.env.*
+*.key
+*.pem
+credentials.json
+*.cred
+auth.json
+
+# ── Testing & Coverage ──
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# ── Build artifacts ──
+*.so
+*.dylib
+*.dll
+
+# ── Docker ──
+.docker/
