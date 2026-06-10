@@ -477,3 +477,7 @@ def main():
         if response is not None:
             sys.stdout.write(json.dumps(response) + "\n")
             sys.stdout.flush()
+
+
+if __name__ == "__main__":
+    main()
