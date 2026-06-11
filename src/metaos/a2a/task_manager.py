@@ -109,6 +109,26 @@ class TaskManager:
         path = self._storage_path_obj()
         path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    def _audit(self, task: A2ATask, event: str) -> None:
+        """B-2 P0: 写 A2A 任务审计轨到 append-only JSONL.
+
+        主存储仍是 JSON (可查询), AppendOnlyLog 增 audit trail (跨仓可聚合).
+        """
+        try:
+            from metaos.audit import audit_log
+            log = audit_log(self._storage_path_obj().parent / "audit", "a2a-task")
+            log.append({
+                "ts": self._ts(),
+                "task_id": task.id,
+                "service": task.service_name,
+                "tool": task.tool_name,
+                "status": task.status,
+                "event": event,
+            })
+        except Exception:
+            # 审计失败不影响主流程
+            pass
+
     def _ts(self) -> str:
         """Current UTC ISO8601 timestamp."""
         return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -146,6 +166,7 @@ class TaskManager:
         )
         self._tasks[task.id] = task
         self._save()
+        self._audit(task, "create")
         return task
 
     def update_task(
@@ -172,6 +193,7 @@ class TaskManager:
         if error:
             task.error = error
         self._save()
+        self._audit(task, f"update:{status}")
         return task
 
     def get_task(self, task_id: str) -> A2ATask | None:

@@ -291,6 +291,10 @@ class DLayer:
         conn.close()
 
     def append_trace_log(self, asset_id: str, event: str, detail: str = ""):
+        """B-2 P0: 除 SQLite 写入外, 并行追加 audit trail 到 JSONL (append-only).
+
+        SQLite 是主存储 (可查询), AppendOnlyLog 是审计轨 (不可变, 跨仓可聚合).
+        """
         conn = sqlite3.connect(str(self.db_path))
         conn.execute(
             "INSERT INTO trace_log (asset_id, event, detail, timestamp) VALUES (?,?,?,?)",
@@ -298,6 +302,19 @@ class DLayer:
         )
         conn.commit()
         conn.close()
+        # B-2 跨仓债 audit trail: append-only JSONL
+        try:
+            from metaos.audit import audit_log
+            log = audit_log(self.data_dir / "audit", "d-layer-trace")
+            log.append({
+                "ts": datetime.now().isoformat() + "Z",
+                "asset_id": asset_id,
+                "event": event,
+                "detail": detail,
+            })
+        except Exception:
+            # 审计失败不影响主流程
+            pass
 
     # ── V7.0：Session 持久化 ──
 
