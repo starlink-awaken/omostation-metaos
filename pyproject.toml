@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "metaos"
-version = "0.1.0"
+version = "1.0.0"
 description = "MetaOS — 编排/治理层: 决策门控、免疫监控、路由、数字资产引擎"
 readme = "README.md"
 requires-python = ">=3.13"
