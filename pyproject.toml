@@ -19,6 +19,7 @@ dependencies = [
     "pyyaml>=6.0.3",
     "structlog>=0.20",
     "agora",
+    "bus-foundation",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +46,7 @@ line-length = 120
 [tool.uv.sources]
 agora = { path = "../agora", editable = true }
 l4-kernel = { path = "../l4-kernel", editable = true }
+bus-foundation = { path = "../bus-foundation" }
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "S", "PLE", "RUF100"]

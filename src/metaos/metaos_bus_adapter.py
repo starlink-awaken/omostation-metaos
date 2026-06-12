@@ -13,8 +13,8 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from agora.bus import BusEnvelope
-from agora.bus import publish as bus_publish
+from bus_foundation import BusEnvelope
+from bus_foundation import publish as bus_publish
 
 
 def publish_node_event(
