@@ -20,6 +20,7 @@ dependencies = [
     "structlog>=0.20",
     "agora",
     "bus-foundation",
+    "requests>=2.34.2",
 ]
 
 [project.optional-dependencies]
@@ -57,5 +58,7 @@ quote-style = "double"
 
 [dependency-groups]
 dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.4.0",
     "requests>=2.34.2",
 ]
