@@ -225,6 +225,15 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("ssot-scan", help="SSOT 覆盖扫描")
 
+    # T3.2: 准入网关
+    p_admit = sub.add_parser("admit", help="Agent 准入网关 (eCOS v6.1 T3.2)")
+    p_admit.add_argument("--domain", default="unknown", help="接入域名称")
+    p_admit.add_argument("--role", default="unknown", help="运行角色 (generator/evaluator)")
+    p_admit.add_argument("--values", default="", help="价值观声明 (逗号分隔)")
+    p_admit.add_argument("--otlp", action="store_true", help="是否支持 OTLP")
+    p_admit.add_argument("--audit-id", default="", help="OMO 审计标识")
+    p_admit.add_argument("--capabilities", default="", help="特权需求声明")
+
     args = parser.parse_args(argv if argv else None)
 
     if args.command is None:
@@ -242,6 +251,26 @@ def main(argv: list[str] | None = None) -> int:
         cli.trace()
     elif args.command == "gate":
         cli.gate(args.decision)
+    elif args.command == "admit":
+        from metaos.layers.admission_gateway import AdmissionGateway
+        gateway = AdmissionGateway()
+        req = {
+            "domain": args.domain,
+            "role": args.role,
+            "declared_values": args.values.split(",") if args.values else [],
+            "supports_otlp": args.otlp,
+            "omo_audit_trail_id": args.audit_id,
+            "capabilities": args.capabilities.split(",") if args.capabilities else []
+        }
+        result = gateway.evaluate_admission(req)
+        if result["status"] == "admitted":
+            print(f"✅ 准入通过 (Admitted): {result['reasons'][0]}")
+        else:
+            print("❌ 准入拦截 (Rejected):")
+            for reason in result['reasons']:
+                print(f"   - {reason}")
+            import sys
+            sys.exit(1)
     elif args.command == "review":
         cli.review(args.action, args.expected, args.actual)
     elif args.command == "run":

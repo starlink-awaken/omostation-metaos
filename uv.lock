@@ -240,7 +240,7 @@ wheels = [
 
 [[package]]
 name = "bus-foundation"
-version = "0.1.0"
+version = "0.1.1"
 source = { directory = "../bus-foundation" }
 dependencies = [
     { name = "pydantic" },

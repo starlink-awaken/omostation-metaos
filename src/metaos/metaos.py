@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cli import CLI  # type: ignore[import-not-found]
 
 from metaos.core.engine import SEngine  # type: ignore[import-not-found]
+from metaos.layers.admission_gateway import AdmissionGateway
 
 
 def get_engine_and_cli(data_dir: str = "") -> tuple:
@@ -104,6 +105,28 @@ def cmd_logout(args):
         print("✅ 已登出")
     else:
         print("ℹ️  未登录")
+
+
+def cmd_admit(args):
+    """(T3.2) 触发决策网关准入控制，评估 Agent / Domain"""
+    gateway = AdmissionGateway()
+    # Mock extracting request capabilities from CLI args for demonstration
+    req = {
+        "domain": args.domain,
+        "role": args.role,
+        "declared_values": args.values.split(",") if args.values else [],
+        "supports_otlp": args.otlp,
+        "omo_audit_trail_id": args.audit_id,
+        "capabilities": args.capabilities.split(",") if args.capabilities else []
+    }
+    result = gateway.evaluate_admission(req)
+    if result["status"] == "admitted":
+        print(f"✅ 准入通过 (Admitted): {result['reasons'][0]}")
+    else:
+        print("❌ 准入拦截 (Rejected):")
+        for reason in result['reasons']:
+            print(f"   - {reason}")
+        sys.exit(1)
 
 
 # ── 辅助函数 ──
@@ -323,61 +346,72 @@ def main():
     )
     parser.add_argument("--data-dir", default="", help="数据目录（默认临时目录）")
 
-    sub = parser.add_subparsers(dest="command")
+    subparsers = parser.add_subparsers(dest="command")
 
     # morning
-    p = sub.add_parser("morning", help="晨间仪式")
+    p = subparsers.add_parser("morning", help="晨间仪式")
     p.add_argument("text", nargs="?", default="", help="晨间引导语")
     p.add_argument("--h-id", default="", help="H ID（首次自动注册）")
     p.add_argument("--name", default="", help="显示名称")
 
     # evening
-    p = sub.add_parser("evening", help="晚间整合")
+    p = subparsers.add_parser("evening", help="晚间整合")
     p.add_argument("text", nargs="?", default="", help="晚间引导语")
     p.add_argument("--h-id", default="")
     p.add_argument("--name", default="")
 
     # review
-    p = sub.add_parser("review", help="微粒复盘")
+    p = subparsers.add_parser("review", help="微粒复盘")
     p.add_argument("action", help="行动描述")
     p.add_argument("expected", help="预期结果")
     p.add_argument("actual", help="实际结果")
     p.add_argument("--h-id", default="")
 
     # gate
-    p = sub.add_parser("gate", help="决策门控")
+    p = subparsers.add_parser("gate", help="决策门控")
     p.add_argument("text", help="需要判定的决策")
     p.add_argument("--h-id", default="")
 
     # status
-    p = sub.add_parser("status", help="体系健康度")
+    p = subparsers.add_parser("status", help="体系健康度")
     p.add_argument("--h-id", default="")
 
     # trace
-    p = sub.add_parser("trace", help="决策日志")
+    p = subparsers.add_parser("trace", help="决策日志")
     p.add_argument("decision_id", nargs="?", default="", help="决策 ID")
     p.add_argument("--h-id", default="")
 
     # ssot
-    sub.add_parser("ssot", help="SSOT 覆盖扫描")
+    subparsers.add_parser("ssot", help="SSOT 覆盖扫描")
 
     # register
-    p = sub.add_parser("register", help="注册新 H")
+    p = subparsers.add_parser("register", help="注册新 H")
     p.add_argument("h_id", help="H ID")
     p.add_argument("--name", default="", help="显示名称")
 
     # logout
-    sub.add_parser("logout", help="登出")
+    p_logout = subparsers.add_parser("logout", help="退出登录")
+    p_logout.set_defaults(func=cmd_logout)
 
     # day
-    p = sub.add_parser("day", help="启动指南日课（1-7）")
+    p = subparsers.add_parser("day", help="启动指南日课（1-7）")
     p.add_argument("day", help="天数")
     p.add_argument("--h-id", default="")
     p.add_argument("--name", default="")
 
     # interactive
-    sub.add_parser("interactive", help="交互式 REPL 模式")
-    sub.add_parser("shell", help="交互式 REPL 模式（同 interactive）")
+    subparsers.add_parser("interactive", help="交互式 REPL 模式")
+    subparsers.add_parser("shell", help="交互式 REPL 模式（同 interactive）")
+
+    # admission
+    p_admit = subparsers.add_parser("admit", help="Agent 准入网关 (eCOS v6.1 T3.2)")
+    p_admit.add_argument("--domain", default="unknown", help="接入域名称")
+    p_admit.add_argument("--role", default="unknown", help="运行角色 (generator/evaluator)")
+    p_admit.add_argument("--values", default="", help="价值观声明 (逗号分隔)")
+    p_admit.add_argument("--otlp", action="store_true", help="是否支持 OTLP")
+    p_admit.add_argument("--audit-id", default="", help="OMO 审计标识")
+    p_admit.add_argument("--capabilities", default="", help="特权需求声明")
+    p_admit.set_defaults(func=cmd_admit)
 
     args = parser.parse_args()
 
