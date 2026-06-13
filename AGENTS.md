@@ -113,3 +113,20 @@ uv run pytest tests/integration/test_chaos_workflow.py -v
 4. **认知框架路径** — 从 L0 `ecos/src/ecos/ssot/mof/m1/cognitive_framework/` 动态加载
 5. **Workflow 状态在 SQLite** — `workflow_store.py`，断点续跑依赖此文件
 6. **Ollama 后端需本地实例** — M 层测试中 MockBackend 用于降级场景
+
+
+## Bus foundation (跨仓依赖)
+
+本项目通过 `metaos_bus_adapter.py` 接入 [bus-foundation](https://github.com/starlink-awaken/omostation/tree/main/projects/bus-foundation) (R66 独立仓):
+
+```python
+from bus_foundation import publish, subscribe, schedule, BusEnvelope
+```
+
+- **Public API**: `publish` / `subscribe` / `schedule` / `BusEnvelope` / `EventType`
+- **零 agora 依赖**: bus-foundation 是 standalone Python package
+- **公共 API 冻结 6 月** (从 2026-06-12 起)
+- **L0 协议层提升**: 评估 R70-R72, 决策 **Path C: Defer Indefinitely** (见 `projects/bus-foundation/docs/ADR-0003-no-l0-promotion.md`)
+- **修改 bus-foundation**: 提 PR 到 `projects/bus-foundation/`, 改完跑该项目的 `uv run pytest -q` 验证
+
+> 不要直接 import `agora.bus` (那是 backward-compat shim)。新代码用 `from bus_foundation import ...`。
