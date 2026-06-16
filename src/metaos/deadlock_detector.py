@@ -7,7 +7,10 @@ flags long-running waits (>5 min), and suggests READONLY release strategies.
 from __future__ import annotations
 
 import logging
+import os
 import time
+
+_AGORA_API_URL = os.environ.get("AGORA_API_URL", "http://127.0.0.1:8080")
 from typing import Any
 
 _log = logging.getLogger(__name__)
@@ -238,7 +241,7 @@ class DeadlockDetector:
             import httpx
 
             httpx.post(
-                "http://127.0.0.1:8080/v1/tools/call",
+                f"{_AGORA_API_URL}/v1/tools/call",
                 json={
                     "name": "append_ssb_log",
                     "arguments": {

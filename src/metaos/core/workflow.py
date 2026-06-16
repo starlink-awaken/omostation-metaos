@@ -10,9 +10,12 @@
 
 import asyncio
 import logging
+import os
 from dataclasses import dataclass, field
 
 import requests
+
+_AGORA_API_URL = os.environ.get("AGORA_API_URL", "http://127.0.0.1:8080")
 
 from metaos.core.engine import SEngine
 from metaos.core.types import Task
@@ -254,7 +257,7 @@ class Workflow:
         """发布节点状态 SSE 事件到 Agora 网格"""
         try:
             requests.post(
-                "http://127.0.0.1:8080/v1/events",
+                f"{_AGORA_API_URL}/v1/events",
                 json={
                     "source": "metaos_workflow",
                     "target": node.task_type,
@@ -275,7 +278,7 @@ class Workflow:
         """Gap #2: 广播 human_approval_required 事件，等待人工介入"""
         try:
             requests.post(
-                "http://127.0.0.1:8080/v1/events",
+                f"{_AGORA_API_URL}/v1/events",
                 json={
                     "source": "metaos_workflow",
                     "target": "human",
