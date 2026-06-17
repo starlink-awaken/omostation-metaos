@@ -3,7 +3,8 @@
 > **Layer**: L2 引擎面  
 > **Role**: 编排引擎 — 决策门控 / 免疫监控 / 路由 / 工作流  
 > **Stack**: Python 3.13+, uv, fastmcp, structlog  
-> **Health**: 189 tests, 100% pass
+> **Health**: See local CI and runtime probes
+> **SSOT**: 运行时健康、测试通过率、入口/工具计数以本项目 CI、运行时探针和 workspace governance SSOT 为准
 >
 > 系统全景参见：[`docs/ARCHITECTURE-DIAGRAM.md`](../docs/ARCHITECTURE-DIAGRAM.md)
 

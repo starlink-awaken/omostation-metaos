@@ -13,8 +13,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from bus_foundation import BusEnvelope
-from bus_foundation import publish as bus_publish
+from bus_foundation.facade import event as bus_event
 
 
 def publish_node_event(
@@ -27,15 +26,19 @@ def publish_node_event(
 
     Returns event_id.
     """
-    env = BusEnvelope(
-        type=f"node_{status}",  # matches workflow.py:261 event_type format
-        source="metaos_workflow",
+    trace_id = f"metaos-{uuid.uuid4().hex[:6]}"
+    topic = f"node_{status}"
+    
+    # Facade returns None, so we return trace_id to maintain return type signature
+    bus_event.publish(
+        topic=topic,
         payload={
             "workflow_id": workflow_id,
             "node_id": node_id,
             "status": status,
             **(payload or {}),
         },
-        trace_id=f"metaos-{uuid.uuid4().hex[:6]}",
+        source_uri="bos://governance/metaos_workflow",
+        trace_id=trace_id
     )
-    return bus_publish(env)
+    return trace_id
