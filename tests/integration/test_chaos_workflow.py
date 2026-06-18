@@ -1,9 +1,11 @@
 import asyncio
 import logging
 from unittest.mock import MagicMock
+
 import pytest
-from metaos.core.workflow import Workflow, WorkflowNode
+
 from metaos.core.engine import SEngine
+from metaos.core.workflow import Workflow, WorkflowNode
 
 logging.basicConfig(level=logging.INFO)
 
@@ -14,7 +16,7 @@ async def test_chaos_timeout_and_cascade():
     ensuring it cascade-fails all downstream nodes but doesn't block the parallel ones.
     """
     mock_engine = MagicMock(spec=SEngine)
-    
+
     # We will simulate that 'gather_academic' hangs forever (Chaos)
     # while 'gather_web' finishes normally.
     def chaotic_process(task):
@@ -30,16 +32,16 @@ async def test_chaos_timeout_and_cascade():
             return {"status": "completed", "output": "Normal Result"}
 
     mock_engine.process.side_effect = chaotic_process
-    
+
     wf = Workflow("chaos_wf", mock_engine)
     wf.add_node(WorkflowNode(node_id="gather_web", task_type="mock_task", input_prompt="Web"))
     # Set a very short timeout to trigger the chaos cascade fast!
     wf.add_node(WorkflowNode(node_id="gather_academic", task_type="mock_task", input_prompt="Academic", timeout_seconds=1))
     wf.add_node(WorkflowNode(node_id="synthesize", task_type="reasoning", input_prompt="Combine", depends_on=["gather_web", "gather_academic"]))
-    
+
     print("\n🚀 Starting Chaotic Workflow Execution...")
     await wf.run()
-    
+
     print("\n🏁 Asserting Chaos Results:")
     assert wf.nodes["gather_web"].status == "completed", "Independent node should complete"
     assert wf.nodes["gather_academic"].status == "timed_out", "Hanging node should fail via timeout"

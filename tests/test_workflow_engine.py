@@ -3,12 +3,13 @@
 All tests use Mock backends to avoid Ollama/SQLite dependencies.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from metaos.core.workflow import Workflow, WorkflowNode
 from metaos.core.workflow_parser import WorkflowParser
 from metaos.core.workflow_planner import WorkflowPlanner
-
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ class TestWorkflow:
         """Steps execute in topological order."""
         with patch.object(simple_workflow, '_publish_event'):
             await simple_workflow.run()
-        
+
         assert simple_workflow.nodes["step1"].status == "completed"
         assert simple_workflow.nodes["step2"].status == "completed"
         assert mock_engine.process.call_count == 2
@@ -70,7 +71,6 @@ class TestWorkflow:
         call_order = []
         def track_call(task):
             # task_id format: "{workflow_id}_{node_id}"
-            node_id = task.task_id.split("_", 1)[-1].replace("test_wf_", "")
             call_order.append(task.task_id.split("_")[-1])  # last segment = node_id
             return {"status": "completed", "output": "done"}
 
@@ -87,7 +87,7 @@ class TestWorkflow:
         wf = Workflow(workflow_id="fail_wf", engine=mock_engine)
         wf.add_node(WorkflowNode(node_id="n1", task_type="reasoning", input_prompt="fail me"))
         wf.add_node(WorkflowNode(node_id="n2", task_type="reasoning", input_prompt="never run", depends_on=["n1"]))
-        
+
         with patch.object(wf, '_publish_event'):
             await wf.run()
 

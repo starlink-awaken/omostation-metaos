@@ -28,7 +28,7 @@ def publish_node_event(
     """
     trace_id = f"metaos-{uuid.uuid4().hex[:6]}"
     topic = f"node_{status}"
-    
+
     # Facade returns None, so we return trace_id to maintain return type signature
     bus_event.publish(
         topic=topic,
