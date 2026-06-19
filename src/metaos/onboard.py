@@ -5,8 +5,7 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.resolve()))
-from cli import CLI  # type: ignore[import-not-found]
+from metaos.cli import CLI  # type: ignore[import-not-found]
 
 from metaos.core.engine import SEngine  # type: ignore[import-not-found]
 

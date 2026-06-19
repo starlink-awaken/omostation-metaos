@@ -7,10 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-# 确保能找到 engine 模块
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from cli import CLI  # type: ignore[import-not-found]
+from metaos.cli import CLI  # type: ignore[import-not-found]
 
 from metaos.core.engine import SEngine  # type: ignore[import-not-found]
 from metaos.layers.admission_gateway import AdmissionGateway
