@@ -3,12 +3,10 @@
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
 from metaos.cli import CLI  # type: ignore[import-not-found]
-
 from metaos.core.engine import SEngine  # type: ignore[import-not-found]
 from metaos.layers.admission_gateway import AdmissionGateway
 

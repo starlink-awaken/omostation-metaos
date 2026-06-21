@@ -1,12 +1,10 @@
 """MetaOS Onboard — 交互式启动向导"""
 
 import json
-import sys
 import time
 from pathlib import Path
 
 from metaos.cli import CLI  # type: ignore[import-not-found]
-
 from metaos.core.engine import SEngine  # type: ignore[import-not-found]
 
 DEFAULT_DATA_DIR = str(Path.home() / ".metaos" / "data")
