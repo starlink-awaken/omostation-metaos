@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""MetaOS MCP Server — 多 session 隔离版 (B-03 修复)"""
+"""MetaOS MCP Server — 多 session 隔离版 (B-03 修复)
+
+!! 此独立入口已弃用 (deprecated) !!
+请使用 bos://ecos/workflow 通过 Agora 路由调用。
+参见: skills/workflow-orchestration-convergence/SKILL.md
+"""
 
 import contextlib
 import io
@@ -464,6 +469,7 @@ def main():
     )
     logger = logging.getLogger("metaos.mcp")
     logger.info("MetaOS MCP 服务器启动 (多 session 隔离)")
+    logger.warning("!! 此独立入口已弃用 (deprecated) !! 请使用 bos://ecos/workflow 通过 Agora 路由调用")
 
     buffer = ""
     for line in sys.stdin:
