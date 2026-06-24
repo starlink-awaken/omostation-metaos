@@ -45,7 +45,7 @@ target-version = "py313"
 line-length = 120
 
 [tool.uv.sources]
-agora = { path = "../agora" }
+agora = { path = "../agora", editable = true }
 l4-kernel = { path = "../l4-kernel", editable = true }
 bus-foundation = { path = "../bus-foundation" }
 

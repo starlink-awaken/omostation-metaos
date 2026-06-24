@@ -2,6 +2,7 @@
 
 import json
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -185,6 +186,7 @@ class CLI:
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point for MetaOS."""
+    print("⚠️ MetaOS 独立 CLI 已弃用，请使用 cockpit 替代", file=sys.stderr)
     import argparse
 
     parser = argparse.ArgumentParser(

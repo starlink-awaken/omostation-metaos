@@ -11,7 +11,7 @@ resolution-markers = [
 [[package]]
 name = "agora"
 version = "3.0.0"
-source = { directory = "../agora" }
+source = { editable = "../agora" }
 dependencies = [
     { name = "aiohttp" },
     { name = "bus-foundation" },
@@ -1050,7 +1050,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agora", directory = "../agora" },
+    { name = "agora", editable = "../agora" },
     { name = "bus-foundation", directory = "../bus-foundation" },
     { name = "fastmcp", specifier = ">=3.4.2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
