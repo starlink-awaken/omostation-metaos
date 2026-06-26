@@ -56,3 +56,5 @@ coverage.xml
 
 # ── Generated governance artifacts ──
 .omo/_knowledge/
+.omc/
+*.tmp
