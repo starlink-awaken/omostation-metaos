@@ -32,6 +32,7 @@ dev = [
 
 [project.scripts]
 metaos = "metaos.cli:main"
+metaos-agent = "metaos.agent_cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/metaos"]
