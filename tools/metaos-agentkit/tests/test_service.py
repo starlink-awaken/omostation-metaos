@@ -23,6 +23,24 @@ def test_global_init_preserves_existing_content_and_is_idempotent(tmp_path: Path
     assert existing.read_text(encoding="utf-8") == first
 
 
+def test_global_init_replaces_legacy_versioned_marker_in_place(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    target = home / ".codex" / "AGENTS.md"
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        "# Keep\n<!-- METAOS-AGENTKIT:BEGIN v0.1.0 -->\nold policy\n<!-- METAOS-AGENTKIT:END -->\n# Keep after\n",
+        encoding="utf-8",
+    )
+
+    install_global(home=home, providers=("codex",), apply=True)
+    content = target.read_text(encoding="utf-8")
+
+    assert "v0.1.0" not in content
+    assert content.count("METAOS-AGENTKIT:BEGIN") == 1
+    assert "# Keep" in content
+    assert "# Keep after" in content
+
+
 def test_local_init_keeps_metaos_out_of_shared_gitignore(tmp_path: Path) -> None:
     home = tmp_path / "home"
     project = tmp_path / "project"
@@ -45,9 +63,25 @@ def test_task_projection_matches_canonical_agent_session_shape(tmp_path: Path) -
     assert payload["description"] == "Fix bug"
     assert payload["risk"] == "R2"
     assert payload["mode"] == "stage"
+    assert payload["capability"]["profile"] == "repo-stage"
     assert payload["status"] == "prepared"
     assert payload["decision_id"] == ""
     assert payload["asset_id"] == ""
+
+
+def test_task_projection_keeps_explicit_mcp_request_machine_readable(tmp_path: Path) -> None:
+    task = create_task(
+        project=tmp_path,
+        description="Research documentation",
+        risk="R1",
+        mode="observe",
+        capability_profile="research-read",
+        allowed_mcp_servers=("web-reader", "web-reader", "docs"),
+    )
+    payload = json.loads(task.read_text(encoding="utf-8"))
+
+    assert payload["capability"]["profile"] == "research-read"
+    assert payload["capability"]["requested"] == ["mcp:web-reader", "mcp:docs"]
 
 
 def test_uninstall_only_removes_managed_block_and_link(tmp_path: Path) -> None:
@@ -82,6 +116,6 @@ def test_launch_preview_does_not_gate_or_forward_adapter_options(tmp_path: Path,
     create_task(project=project, description="Preview stage", risk="R2", mode="stage")
     assert main(["--home", str(tmp_path / "home"), "launch", "codex", "--mode", "stage", "--path", str(project), "--", "--help"]) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["provider_command"] == ["codex", "--help"]
+    assert payload["provider"] == "codex"
     assert "prepare" in payload["bridge_command"]
     assert payload["note"].startswith("Preview only")
