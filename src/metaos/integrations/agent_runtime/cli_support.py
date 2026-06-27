@@ -14,4 +14,5 @@ def prepare_payload(session: AgentSession, context: ProviderLaunchContext) -> di
             "environment": context.environment,
             "instruction_block": context.instruction_block,
         },
+        "capability_policy": context.capability_policy,
     }
