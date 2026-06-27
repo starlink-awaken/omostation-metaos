@@ -24,9 +24,10 @@ A profile never overrides a red gate. A session that fails profile validation is
 | `repo-read` | R1, observe/propose | read-only | none | none |
 | `research-read` | R1, observe/propose | read-only, no default network | explicit named read-only servers only | none |
 | `repo-stage` | R2, stage | workspace-write + approval request | none | detached Git worktree |
+| `high-risk-stage` | R3–R4, stage | workspace-write + approval request | none | detached Git worktree |
 | `external-commit` | R3–R4, commit | workspace-write + approval request | explicit named servers only | no automatic worktree; requires Gate/confirmation |
 
-The profile is selected by `metaos-agentkit task new --profile ...` or inferred from risk and mode.
+The profile is selected by `metaos-agentkit task new --profile ...` or inferred from risk and mode. High-risk stage is intentionally distinct from external commit: it permits an isolated rehearsal, patch, or plan but not an external side effect.
 
 ## Provider translation
 
@@ -34,7 +35,7 @@ The profile is selected by `metaos-agentkit task new --profile ...` or inferred 
 
 AgentKit renders session-specific command arguments:
 
-- working directory is the isolated worktree for `repo-stage`;
+- working directory is the isolated worktree for `repo-stage` and `high-risk-stage`;
 - sandbox is selected from the resolved profile;
 - approval policy is selected from the resolved profile;
 - workspace network access is set to the profile value;
@@ -66,9 +67,9 @@ metaos-agentkit task new "Read official documentation" \
 
 The request is still subject to Profile validation and MetaOS Gate evaluation. An MCP server name in a task does not create a connection, supply a token, or grant provider permission outside the configured provider runtime.
 
-## R2 stage worktree
+## Stage worktrees
 
-`repo-stage` creates a detached worktree under:
+`repo-stage` and `high-risk-stage` create a detached worktree under:
 
 ```text
 ~/.metaos/agentkit/worktrees/<repository-hash>/<session-id>/
