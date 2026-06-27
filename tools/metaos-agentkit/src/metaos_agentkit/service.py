@@ -238,10 +238,9 @@ def create_task(*, project: Path, description: str, risk: str, mode: str, apply:
     if mode not in valid_modes:
         raise ValueError(f"mode must be one of {', '.join(sorted(valid_modes))}")
     task_id = f"task-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
-    session_id = f"agent-{uuid4().hex[:16]}"
     task_dir = project_home(project.resolve()) / "tasks" / task_id
     payload = {
-        "session_id": session_id,
+        "session_id": f"agent-{uuid4().hex[:16]}",
         "task_id": task_id,
         "h_id": "",
         "provider": "generic",
@@ -274,18 +273,18 @@ def create_task(*, project: Path, description: str, risk: str, mode: str, apply:
 
 
 def approve_task(*, project: Path, home: Path, comment: str = "") -> Path:
-    return _session_transition(project=project, home=home, action="approve", comment=comment)
+    return _session_transition(project=project, home=home, action="approve", output_name="approved-session.json", comment=comment)
 
 
 def reject_task(*, project: Path, home: Path, comment: str = "") -> Path:
-    return _session_transition(project=project, home=home, action="reject", comment=comment)
+    return _session_transition(project=project, home=home, action="reject", output_name="rejected-session.json", comment=comment)
 
 
-def _session_transition(*, project: Path, home: Path, action: str, comment: str) -> Path:
+def _session_transition(*, project: Path, home: Path, action: str, output_name: str, comment: str) -> Path:
     session_file = _latest_session(project)
     if not session_file:
         raise ValueError("No AgentKit session found. Run task new first.")
-    output = session_file.parent / f"{action}d-session.json"
+    output = session_file.parent / output_name
     result = _run_bridge(
         project=project,
         home=home,
@@ -302,21 +301,30 @@ def launch(*, provider: str, project: Path, home: Path, mode: str | None, provid
     session_file = _latest_session(project)
     if not session_file:
         raise ValueError("No AgentKit session found. Run task new first.")
-    session = json.loads(session_file.read_text(encoding="utf-8"))
-    if mode:
-        session["mode"] = mode
-    session["provider"] = provider
-    session_file.write_text(json.dumps(session, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    session = _load_session(session_file)
+    status = session.get("status", "")
+    if status in {"finalized", "failed", "cancelled"}:
+        raise ValueError(f"Cannot launch a {status} session. Create a new task.")
 
-    prepared = session_file.parent / "prepared-session.json"
-    bridge_args = ["prepare", "--session-file", str(session_file), "--out", str(prepared)]
+    governed = bool(session.get("decision_id") and session.get("asset_id"))
+    if governed:
+        if mode and mode != session.get("mode"):
+            raise ValueError("Cannot change mode after MetaOS governance. Create a new task.")
+        if session.get("provider") not in {"generic", provider}:
+            raise ValueError("Cannot change provider after MetaOS governance. Create a new task.")
+    else:
+        if mode:
+            session["mode"] = mode
+        session["provider"] = provider
+        session_file.write_text(json.dumps(session, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
     command = [provider, *provider_args]
     if not execute:
         print(
             json.dumps(
                 {
                     "provider_command": command,
-                    "bridge_command": [*_runtime_command(project), "--data-dir", str(metaos_root(home) / "data"), *bridge_args],
+                    "bridge_command": [*_runtime_command(project), "--data-dir", str(metaos_root(home) / "data"), "prepare", "--session-file", str(session_file)],
                     "session_file": str(session_file),
                     "note": "Preview only: no gate evaluation and no provider launch occurred.",
                 },
@@ -326,28 +334,43 @@ def launch(*, provider: str, project: Path, home: Path, mode: str | None, provid
         )
         return 0
 
-    prepared_result = _run_bridge(project=project, home=home, arguments=bridge_args)
-    if prepared_result.returncode != 0:
-        _emit_bridge_result(prepared_result)
-        return prepared_result.returncode
-    payload = _parse_bridge_payload(prepared_result.stdout)
-    prepared_session = payload["session"]
-    if prepared_session["status"] == "blocked":
-        _emit_bridge_result(prepared_result)
-        return 3
+    if governed:
+        if session.get("status") == "blocked":
+            raise ValueError("Session is blocked. Approve/reject the pending MetaOS session before launch.")
+        if session.get("status") != "prepared":
+            raise ValueError(f"Session must be prepared before launch; current status is {session.get('status')}.")
+        prepared_file = session_file
+        prepared_session = session
+        launch_context = _local_launch_context(prepared_session)
+    else:
+        prepared_file = session_file.parent / "prepared-session.json"
+        prepared_result = _run_bridge(
+            project=project,
+            home=home,
+            arguments=["prepare", "--session-file", str(session_file), "--out", str(prepared_file)],
+        )
+        if prepared_result.returncode != 0:
+            _emit_bridge_result(prepared_result)
+            return prepared_result.returncode
+        payload = _parse_bridge_payload(prepared_result.stdout)
+        prepared_session = payload["session"]
+        if prepared_session["status"] == "blocked":
+            _emit_bridge_result(prepared_result)
+            return 3
+        launch_context = payload.get("launch_context", {})
 
-    running = session_file.parent / "running-session.json"
+    running = prepared_file.parent / "running-session.json"
     running_result = _run_bridge(
         project=project,
         home=home,
-        arguments=["mark-running", "--session-file", str(prepared), "--out", str(running)],
+        arguments=["mark-running", "--session-file", str(prepared_file), "--out", str(running)],
     )
     if running_result.returncode != 0:
         _emit_bridge_result(running_result)
         return running_result.returncode
 
     env = os.environ.copy()
-    env.update(payload.get("launch_context", {}).get("environment", {}))
+    env.update(launch_context.get("environment", {}))
     env["METAOS_PROJECT_ROOT"] = str(project.resolve())
     env["METAOS_AGENT_SESSION_FILE"] = str(running)
     env["METAOS_AGENTKIT_HOME"] = str(global_home(home))
@@ -385,15 +408,26 @@ def _latest_session(project: Path) -> Path | None:
     tasks = project_home(project.resolve()) / "tasks"
     if not tasks.exists():
         return None
-    candidates = sorted(
-        tasks.glob("*/running-session.json")
-        or tasks.glob("*/approved-session.json")
-        or tasks.glob("*/prepared-session.json")
-        or tasks.glob("*/agent-session.json"),
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
-    return candidates[0] if candidates else None
+    names = ("running-session.json", "approved-session.json", "prepared-session.json", "agent-session.json")
+    candidates = [path for name in names for path in tasks.glob(f"*/{name}")]
+    return max(candidates, key=lambda path: path.stat().st_mtime) if candidates else None
+
+
+def _load_session(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _local_launch_context(session: dict) -> dict:
+    return {
+        "environment": {
+            "METAOS_AGENT_SESSION_ID": session["session_id"],
+            "METAOS_TASK_ID": session["task_id"],
+            "METAOS_MODE": session["mode"],
+            "METAOS_RISK": session["risk"],
+            "METAOS_GATE_DECISION": session["gate_decision"],
+            "METAOS_CAPABILITY_PROFILE": session.get("capability", {}).get("profile", "core"),
+        }
+    }
 
 
 def _runtime_command(project: Path) -> list[str]:
@@ -421,6 +455,11 @@ def _run_bridge(*, project: Path, home: Path, arguments: list[str]) -> subproces
 
 
 def _parse_bridge_payload(stdout: str) -> dict:
+    for candidate in reversed([line for line in stdout.splitlines() if line.strip()]):
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
     try:
         return json.loads(stdout)
     except json.JSONDecodeError as exc:
