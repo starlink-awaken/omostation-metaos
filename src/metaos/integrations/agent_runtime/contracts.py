@@ -1,11 +1,12 @@
 """Canonical contracts shared by MetaOS and provider adapters.
 
-Operational risk, execution mode, and dynamic gate result are deliberately
-separate concepts:
+Operational risk, execution mode, dynamic gate result, and human confirmation
+are deliberately separate concepts:
 
 * risk class describes the inherent impact of the requested operation;
 * execution mode limits what the adapter may attempt;
-* gate decision is MetaOS's runtime authorization outcome for this session.
+* gate decision is MetaOS's runtime authorization outcome for this session;
+* confirmation records the human response required by a yellow gate.
 """
 
 from __future__ import annotations
@@ -47,6 +48,13 @@ class SessionStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class ConfirmationStatus(StrEnum):
+    NOT_REQUIRED = "not_required"
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 @dataclass
 class VerificationPlan:
     commands: list[str] = field(default_factory=list)
@@ -78,6 +86,7 @@ class AgentSession:
     mode: ExecutionMode = ExecutionMode.OBSERVE
     gate_decision: str = "green"
     gate_reason: str = ""
+    confirmation_status: ConfirmationStatus = ConfirmationStatus.NOT_REQUIRED
     capability: CapabilityRequest = field(default_factory=CapabilityRequest)
     scope: list[str] = field(default_factory=list)
     exclusions: list[str] = field(default_factory=list)
@@ -98,6 +107,7 @@ class AgentSession:
         data["provider"] = self.provider.value
         data["risk"] = self.risk.value
         data["mode"] = self.mode.value
+        data["confirmation_status"] = self.confirmation_status.value
         data["status"] = self.status.value
         data["created_at"] = self.created_at.isoformat()
         data["finalized_at"] = self.finalized_at.isoformat() if self.finalized_at else None
@@ -119,6 +129,9 @@ class AgentSession:
             mode=ExecutionMode(data.get("mode", ExecutionMode.OBSERVE.value)),
             gate_decision=data.get("gate_decision", "green"),
             gate_reason=data.get("gate_reason", ""),
+            confirmation_status=ConfirmationStatus(
+                data.get("confirmation_status", ConfirmationStatus.NOT_REQUIRED.value)
+            ),
             capability=CapabilityRequest(**capability),
             scope=list(data.get("scope") or []),
             exclusions=list(data.get("exclusions") or []),
