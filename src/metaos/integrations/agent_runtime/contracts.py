@@ -64,7 +64,8 @@ class VerificationPlan:
 
 @dataclass
 class CapabilityRequest:
-    profile: str = "core"
+    # Empty means the runtime derives a profile from risk and mode.
+    profile: str = ""
     requested: list[str] = field(default_factory=list)
     denied: list[str] = field(default_factory=list)
 
