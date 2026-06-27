@@ -12,8 +12,10 @@ import sys
 from pathlib import Path
 
 from metaos.core.engine import SEngine
+from metaos.integrations.agent_runtime.canonical import load_canonical_session
 from metaos.integrations.agent_runtime.cli_support import prepare_payload
 from metaos.integrations.agent_runtime.contracts import AgentSession
+from metaos.integrations.agent_runtime.provider_context import build_provider_context
 from metaos.integrations.agent_runtime.service import AgentRuntimeService
 
 
@@ -29,6 +31,9 @@ def _parser() -> argparse.ArgumentParser:
     prepare.add_argument("--session-file", type=Path, required=True, help="AgentSession JSON input")
     prepare.add_argument("--out", type=Path, required=True, help="Prepared AgentSession JSON output")
     prepare.add_argument("--access-level", default="owner", choices=ACCESS_LEVELS)
+
+    context = sub.add_parser("context", help="Read canonical session state and its resolved provider policy")
+    context.add_argument("--session-file", type=Path, required=True)
 
     approve = sub.add_parser("approve", help="Approve a pending yellow-gate session")
     approve.add_argument("--session-file", type=Path, required=True)
@@ -66,17 +71,29 @@ def _write_session(path: Path, session: AgentSession) -> None:
     path.write_text(json.dumps(session.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _canonical_context(engine: SEngine, submitted: AgentSession) -> tuple[AgentSession, dict]:
+    session = load_canonical_session(engine, submitted)
+    context = build_provider_context(session, session_asset_path=f"asset:{session.asset_id}")
+    return session, prepare_payload(session, context)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     engine = SEngine(data_dir=args.data_dir)
     runtime = AgentRuntimeService(engine)
     try:
-        session = _read_session(args.session_file)
+        submitted = _read_session(args.session_file)
         if args.command == "prepare":
-            session, context = runtime.prepare(session, access_level=args.access_level)
+            session, context = runtime.prepare(submitted, access_level=args.access_level)
             _write_session(args.out, session)
             print(json.dumps(prepare_payload(session, context), ensure_ascii=False, indent=2))
             return 0 if session.status.value != "blocked" else 3
+        if args.command == "context":
+            _, payload = _canonical_context(engine, submitted)
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0
+
+        session = load_canonical_session(engine, submitted)
         if args.command == "approve":
             session = runtime.approve(session, comment=args.comment, access_level=args.access_level)
             _write_session(args.out, session)
@@ -90,7 +107,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "mark-running":
             session = runtime.mark_running(session, access_level=args.access_level)
             _write_session(args.out, session)
-            print(json.dumps(session.to_dict(), ensure_ascii=False, indent=2))
+            context = build_provider_context(session, session_asset_path=f"asset:{session.asset_id}")
+            print(json.dumps(prepare_payload(session, context), ensure_ascii=False, indent=2))
             return 0
         if args.command == "finalize":
             session = runtime.finalize(
