@@ -24,9 +24,9 @@ AgentKit (provider adapter)
   → metaos-agent finalize
 ```
 
-Operational risk (`R0`–`R4`), execution mode (`observe` / `propose` / `stage` / `commit`), dynamic Gate decision (`green` / `yellow` / `red`), human confirmation, and capability profile are separate dimensions.
+Operational risk (`R0`–`R4`), execution mode (`observe` / `propose` / `stage` / `commit`), dynamic Gate decision (`green` / `yellow` / `red`), human confirmation, target binding, and capability profile are separate dimensions.
 
-Read [Capability Profiles](../../docs/CAPABILITY-PROFILES.md) for the enforcement model.
+Read [Capability Profiles](../../docs/CAPABILITY-PROFILES.md) and [Task Lifecycle](../../docs/TASK-LIFECYCLE.md) for enforcement and operational details.
 
 ## Quick start
 
@@ -40,36 +40,49 @@ cd /path/to/project
 uv run --directory /path/to/omostation-metaos/tools/metaos-agentkit \
   metaos-agentkit init --local --provider codex,claude --apply
 
-# R2 stage: defaults to repo-stage, creates a detached worktree on --execute.
-uv run --directory /path/to/omostation-metaos/tools/metaos-agentkit \
-  metaos-agentkit task new "Fix login TypeScript error" --risk R2 --mode stage
+# R2 stage defaults to repo-stage and creates a detached worktree on --execute.
+TASK=$(uv run --directory /path/to/omostation-metaos/tools/metaos-agentkit \
+  metaos-agentkit task new "Fix login TypeScript error" --risk R2 --mode stage)
 
-# Preview only: does not evaluate Gate, create a worktree, render provider policy, or start a provider.
-uv run --directory /path/to/omostation-metaos/tools/metaos-agentkit \
-  metaos-agentkit launch codex --mode stage -- --help
-
-# Real launch: Gate is evaluated first. A blocked session is never launched.
-uv run --directory /path/to/omostation-metaos/tools/metaos-agentkit \
-  metaos-agentkit launch codex --mode stage --execute
+metaos-agentkit task list
+metaos-agentkit launch codex --task "${TASK##*/}" --mode stage --execute
+metaos-agentkit task finalize --task "${TASK##*/}" \
+  --summary "Focused tests passed" \
+  --evidence "pytest tests/auth -q" \
+  --verification-passed
 ```
 
-Read-only research with one explicitly named MCP server:
+Read-only research with one explicit MCP tool:
 
 ```bash
 metaos-agentkit task new "Verify current provider settings" \
   --risk R1 --mode observe \
   --profile research-read \
-  --allow-mcp web-reader
+  --allow-mcp web-reader:open
 ```
 
-For a yellow commit session:
+High-risk external commit with a short-lived target binding:
 
 ```bash
-metaos-agentkit task approve --comment "Approved for this exact target"
-metaos-agentkit launch codex --execute
-metaos-agentkit task finalize \
-  --summary "Patch applied and target tests passed" \
-  --evidence "pytest tests/auth -q" \
+metaos-agentkit task new "Create a calendar event" \
+  --risk R3 --mode commit --profile external-commit \
+  --target-kind calendar_event \
+  --target calendar:primary \
+  --operation create_event \
+  --scope recipient:alice@example.com \
+  --scope duration:30m \
+  --expires-in-minutes 30 \
+  --success-criterion "Calendar returns an event id" \
+  --verify-expect "Event exists with Alice as attendee" \
+  --rollback "Delete the newly created event" \
+  --allow-mcp calendar:create_event
+
+# List, then use the exact task ID for all high-risk lifecycle actions.
+metaos-agentkit task list
+metaos-agentkit task approve --task task-... --comment "Approved only for Alice, 30 minutes"
+metaos-agentkit launch claude --task task-... --execute
+metaos-agentkit task finalize --task task-... \
+  --summary "Event created and verified" \
   --verification-passed
 ```
 
@@ -81,19 +94,22 @@ metaos-agentkit task finalize \
 | AgentKit global | `~/.metaos/agentkit/` | AgentKit provider integration |
 | AgentKit project | `.metaos/agentkit/` | provider-local projections, staging and audit working files |
 | Session runtime | `.metaos/agentkit/tasks/<task>/runtime/` | generated Provider policy and persisted prepared context |
+| Session audit | `.metaos/agentkit/tasks/<task>/audit/` | launch plan, provider exit, bounded finalization evidence |
 | Provider configuration | `AGENTS.md`, `CLAUDE.md`, `CLAUDE.local.md`, native skill links | marker-bounded AgentKit blocks only |
 
-Provider-local files are projections/caches. Canonical authorization, decisions, assets, lifecycle state, and traces are written by root MetaOS.
+Provider-local files are projections/caches. Canonical authorization, decisions, assets, lifecycle state, target-bound approvals, and traces are written by root MetaOS.
 
 ## Capability enforcement
 
 - `core` / `repo-read`: read-only, no MCP server is allowed.
-- `research-read`: only explicitly named MCP servers may be projected.
+- `research-read`: explicitly named MCP servers or tools may be projected.
 - `repo-stage`: Codex uses workspace write with network off; Claude uses a session overlay and PreToolUse Hook; both run in a detached worktree.
-- `external-commit`: requires MetaOS commit validation and Gate/confirmation; only explicit MCP names are eligible.
+- `high-risk-stage`: R3/R4 planning or rehearsal stays in an isolated worktree with no external effects.
+- `external-commit`: R3/R4 commit requires an expiring target binding and explicit human confirmation, even where the dynamic Gate initially evaluates green.
 - AgentKit rejects provider flags that could replace the session boundary, including Codex sandbox/config/approval flags and Claude settings/permission override flags.
 - Discovered MCP servers not in the session allowlist are disabled for that launch.
-- Provider exit is not success. Only `task finalize` with validation evidence records a final result.
+- Claude enforces server/tool-level MCP requests in the Hook. Codex enforces server disablement and per-tool prompting for an allowed server; it does not yet have an equal tool-deny projection.
+- Provider exit is not success. `task finalize` persists a bounded evidence bundle, but `--verification-passed` remains an explicit success assertion.
 
 ## Commands
 
@@ -102,11 +118,15 @@ metaos-agentkit init --global --provider codex,claude [--apply]
 metaos-agentkit init --local --path /repo --provider codex,claude [--apply]
 metaos-agentkit status [--path /repo]
 metaos-agentkit task new "Description" --risk R2 --mode stage \
-  [--profile repo-stage] [--allow-mcp server] [--path /repo]
-metaos-agentkit task approve [--comment "..."] [--path /repo]
-metaos-agentkit task reject [--comment "..."] [--path /repo]
-metaos-agentkit task finalize --summary "..." [--evidence "..."] [--verification-passed] [--path /repo]
-metaos-agentkit launch codex --mode stage [--path /repo] [--execute] [-- <provider args>]
+  [--profile repo-stage] [--allow-mcp server[:tool]] [--path /repo]
+metaos-agentkit task list [--all] [--path /repo]
+metaos-agentkit task approve --task task-... [--comment "..."] [--path /repo]
+metaos-agentkit task reject --task task-... [--comment "..."] [--path /repo]
+metaos-agentkit task finalize --task task-... --summary "..." \
+  [--evidence "..."] [--verification-passed] [--path /repo]
+metaos-agentkit task archive --task task-... [--apply] [--path /repo]
+metaos-agentkit task cleanup --older-than 14 [--apply] [--path /repo]
+metaos-agentkit launch codex --task task-... --mode stage [--path /repo] [--execute] [-- <provider args>]
 metaos-agentkit uninstall --global --provider codex,claude [--apply]
 
 # Root runtime bridge, installed with the main package:
