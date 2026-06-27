@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from .contracts import AgentSession, ExecutionMode, OperationalRisk
+from .mcp_policy import parse_mcp_requests, requested_mcp_servers as _requested_mcp_servers
 
 
 @dataclass(frozen=True)
@@ -144,10 +145,13 @@ def validate_capability_profile(session: AgentSession) -> list[str]:
     requested_mcp = [item for item in session.capability.requested if item.startswith("mcp:")]
     if requested_mcp and not profile.allow_explicit_mcp:
         violations.append(f"Profile {profile.name} does not permit MCP server requests.")
+    try:
+        parse_mcp_requests(requested_mcp)
+    except ValueError as exc:
+        violations.append(str(exc))
     return violations
 
 
 def requested_mcp_servers(session: AgentSession) -> tuple[str, ...]:
     """Return uniquely requested MCP server names after canonical validation."""
-    names = [item.removeprefix("mcp:") for item in session.capability.requested if item.startswith("mcp:")]
-    return tuple(dict.fromkeys(name for name in names if name))
+    return _requested_mcp_servers(session.capability.requested)
