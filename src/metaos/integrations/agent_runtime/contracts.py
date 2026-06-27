@@ -137,14 +137,17 @@ class AgentSession:
 
 
 def validate_session_policy(session: AgentSession) -> list[str]:
-    """Return policy violations without making an execution decision."""
+    """Return policy violations without making an execution decision.
+
+    High-risk work may still be observed, proposed, or staged. Only a commit
+    request requires explicit success and verification criteria. R4 commit
+    work additionally requires a rollback or containment path.
+    """
     violations: list[str] = []
-    if session.risk in {OperationalRisk.R3, OperationalRisk.R4} and session.mode != ExecutionMode.COMMIT:
-        violations.append("R3/R4 sessions must use commit mode only after explicit authorization.")
     if session.mode == ExecutionMode.COMMIT and not session.success_criteria:
         violations.append("commit mode requires explicit success criteria.")
     if session.mode == ExecutionMode.COMMIT and not session.verification.expected_outcomes:
         violations.append("commit mode requires a verification plan.")
-    if session.risk == OperationalRisk.R4 and not session.rollback_or_containment:
-        violations.append("R4 sessions require rollback or containment instructions.")
+    if session.risk == OperationalRisk.R4 and session.mode == ExecutionMode.COMMIT and not session.rollback_or_containment:
+        violations.append("R4 commit sessions require rollback or containment instructions.")
     return violations
