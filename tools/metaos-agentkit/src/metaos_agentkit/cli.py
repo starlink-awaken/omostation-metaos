@@ -100,6 +100,14 @@ def _show_plans(plans: list[Plan], apply: bool) -> None:
         print("Re-run with --apply to write changes.")
 
 
+def _inferred_profile(risk: str, mode: str, explicit_profile: str | None) -> str | None:
+    if explicit_profile:
+        return explicit_profile
+    if risk in {"R3", "R4"} and mode == "stage":
+        return "high-risk-stage"
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _parser()
     args, unknown = parser.parse_known_args(argv)
@@ -127,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
                         description=args.description,
                         risk=args.risk,
                         mode=args.mode,
-                        capability_profile=args.profile,
+                        capability_profile=_inferred_profile(args.risk, args.mode, args.profile),
                         allowed_mcp_servers=args.allow_mcp,
                     )
                 )
