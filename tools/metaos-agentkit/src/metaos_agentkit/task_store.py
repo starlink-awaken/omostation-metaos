@@ -231,6 +231,11 @@ def _remove_managed_worktree(worktree: Path | None, metaos_home: Path) -> None:
         inside = False
     if not inside:
         raise ValueError("Refusing to remove a worktree outside the MetaOS-managed worktree root.")
-    result = subprocess.run(["git", "worktree", "remove", "--force", str(candidate)], capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        ["git", "-C", str(candidate), "worktree", "remove", "--force", str(candidate)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     if result.returncode != 0 and candidate.exists():
         raise ValueError(f"Could not remove managed worktree: {(result.stderr or result.stdout).strip()}")
