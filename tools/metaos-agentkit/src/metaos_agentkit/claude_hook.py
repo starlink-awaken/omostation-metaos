@@ -69,6 +69,14 @@ def _tool_path(tool_name: str, tool_input: dict[str, Any]) -> str:
     return ""
 
 
+def _mcp_tool_allowed(tool_name: str, allowed: dict[str, list[str]]) -> tuple[bool, str, str]:
+    parts = tool_name.split("__", 2)
+    server = parts[1] if len(parts) > 1 else ""
+    tool = parts[2] if len(parts) > 2 else ""
+    tools = allowed.get(server, [])
+    return ("*" in tools or tool in tools), server, tool
+
+
 def evaluate(payload: dict[str, Any], env: dict[str, str] | None = None) -> dict[str, Any]:
     """Evaluate one Claude PreToolUse payload without provider dependencies."""
     env = env or os.environ
@@ -76,9 +84,13 @@ def evaluate(payload: dict[str, Any], env: dict[str, str] | None = None) -> dict
     tool_input = payload.get("tool_input") or {}
     try:
         policy = json.loads(env.get("METAOS_CAPABILITY_POLICY_JSON", "{}"))
-        allowed_mcp = set(json.loads(env.get("METAOS_ALLOWED_MCP_JSON", "[]")))
+        allowed_mcp_tools = json.loads(
+            env.get("METAOS_ALLOWED_MCP_TOOLS_JSON", json.dumps(policy.get("allowed_mcp_tools", {})))
+        )
     except json.JSONDecodeError:
         return _deny("MetaOS capability policy is invalid; refusing the tool call.")
+    if not isinstance(allowed_mcp_tools, dict) or not all(isinstance(value, list) for value in allowed_mcp_tools.values()):
+        return _deny("MetaOS MCP tool policy is invalid; refusing the tool call.")
 
     workspace_raw = env.get("METAOS_WORKSPACE_ROOT", "")
     if not workspace_raw:
@@ -97,12 +109,11 @@ def evaluate(payload: dict[str, Any], env: dict[str, str] | None = None) -> dict
     if tool_name in {"WebFetch", "WebSearch"} and not network:
         return _deny("Web access is not enabled by this MetaOS capability profile.")
     if tool_name.startswith("mcp__"):
-        parts = tool_name.split("__", 2)
-        server = parts[1] if len(parts) > 1 else ""
-        if server not in allowed_mcp:
-            return _deny(f"MCP server {server!r} is not allowed by this MetaOS capability profile.")
+        allowed, server, tool = _mcp_tool_allowed(tool_name, allowed_mcp_tools)
+        if not allowed:
+            return _deny(f"MCP tool {server!r}/{tool!r} is not allowed by this MetaOS capability profile.")
         if profile_name == "external-commit":
-            return _ask(f"Confirm MCP tool use for allowed server {server!r} in an external-commit session.")
+            return _ask(f"Confirm allowed MCP tool {server!r}/{tool!r} for this external-commit session.")
         return _allow()
 
     if tool_name in {"Read", "Glob", "Grep"}:
