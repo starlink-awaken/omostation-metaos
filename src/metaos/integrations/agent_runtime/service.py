@@ -3,37 +3,51 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 
 from metaos.core.types import AssetLevel, Decision, DecisionLevel, DigitalAsset, Task
 
-from .contracts import AgentSession, ExecutionMode, OperationalRisk, SessionStatus, validate_session_policy
+from .contracts import (
+    AgentSession,
+    ConfirmationStatus,
+    ExecutionMode,
+    OperationalRisk,
+    SessionStatus,
+    validate_session_policy,
+)
 from .provider_context import ProviderLaunchContext, build_provider_context
 
 
 class AgentRuntimeService:
     """Prepare and finalize agent sessions through the MetaOS system of record.
 
-    The service is deliberately thin: it delegates authorization to the
-    existing gate, persistence to DLayer, and anomaly observation to the
-    existing immune monitor. Provider adapters never bypass this service.
+    This service delegates authorization to the existing gate, persistence to
+    DLayer, and anomaly observation to the existing immune monitor. Provider
+    adapters never decide gate outcomes or claim completion on their own.
     """
 
     def __init__(self, engine: Any):
         self.engine = engine
 
     def prepare(self, session: AgentSession, access_level: str = "owner") -> tuple[AgentSession, ProviderLaunchContext]:
-        """Gate and persist a session before a provider can be launched."""
+        """Gate and persist a session before a provider can be launched.
+
+        A successful return with `prepared` means launch is permitted. It does
+        not mean the provider process has started.
+        """
         violations = validate_session_policy(session)
         if violations:
             session.status = SessionStatus.BLOCKED
             session.gate_decision = DecisionLevel.RED.value
             session.gate_reason = "; ".join(violations)
+            session.confirmation_status = ConfirmationStatus.NOT_REQUIRED
+            self._persist_session_asset(session, access_level)
+            decision = self._save_decision(session, DecisionLevel.RED, access_level, action="blocked")
+            session.decision_id = decision.decision_id
             self._persist_session_asset(session, access_level)
             self._trace(session, "agent_session_blocked", session.gate_reason)
-            return session, build_provider_context(session)
+            return session, build_provider_context(session, session_asset_path=f"asset:{session.asset_id}")
 
         task = Task(
             task_id=session.task_id,
@@ -44,32 +58,56 @@ class AgentRuntimeService:
         level, reason, _deadline = self.engine.gate.evaluate(task)
         session.gate_decision = level.value
         session.gate_reason = reason
-
-        if self._must_block(session, level):
-            session.status = SessionStatus.BLOCKED
-        else:
-            session.status = SessionStatus.PREPARED
-
-        asset = self._persist_session_asset(session, access_level)
-        session.asset_id = asset.asset_id
-        decision = Decision(
-            h_id=session.h_id or self.engine.current_h.h_id,
-            level=level.value,
-            action="blocked" if session.status == SessionStatus.BLOCKED else "prepared",
-            description=f"agent_session:{session.session_id} {session.description[:80]}",
-            assets_used=[asset.asset_id],
-            access_level=access_level,
-            outcome_pending_review=(level == DecisionLevel.YELLOW),
+        session.confirmation_status = (
+            ConfirmationStatus.PENDING if level == DecisionLevel.YELLOW else ConfirmationStatus.NOT_REQUIRED
         )
-        self.engine.d.save_decision(decision)
-        session.decision_id = decision.decision_id
-        self._trace(session, "agent_session_prepared", f"gate={level.value}; status={session.status.value}")
+        session.status = SessionStatus.BLOCKED if self._must_block(session, level) else SessionStatus.PREPARED
 
-        if session.status == SessionStatus.PREPARED:
-            session.status = SessionStatus.RUNNING
-            self._persist_session_asset(session, access_level)
-            self._trace(session, "agent_session_launched", f"provider={session.provider.value}")
+        self._persist_session_asset(session, access_level)
+        decision = self._save_decision(session, level, access_level, action="blocked" if session.status == SessionStatus.BLOCKED else "prepared")
+        session.decision_id = decision.decision_id
+        if level == DecisionLevel.YELLOW:
+            self.engine._pending_yellow.append(decision)
+        self._persist_session_asset(session, access_level)
+        self._trace(session, "agent_session_prepared", f"gate={level.value}; status={session.status.value}")
         return session, build_provider_context(session, session_asset_path=f"asset:{session.asset_id}")
+
+    def approve(self, session: AgentSession, *, comment: str = "", access_level: str = "owner") -> AgentSession:
+        """Apply the existing MetaOS human-confirmation path to a yellow session."""
+        if session.gate_decision != DecisionLevel.YELLOW.value or not session.decision_id:
+            raise ValueError("Only a persisted yellow-gate session can be approved.")
+        response = self.engine.h_confirm(session.decision_id, "approved", comment)
+        if response.get("status") != "ok":
+            raise ValueError(response.get("message", "MetaOS confirmation failed"))
+        session.confirmation_status = ConfirmationStatus.APPROVED
+        session.status = SessionStatus.PREPARED
+        self._persist_session_asset(session, access_level)
+        self._trace(session, "agent_session_h_approved", comment)
+        return session
+
+    def reject(self, session: AgentSession, *, comment: str = "", access_level: str = "owner") -> AgentSession:
+        """Reject a pending yellow session and preserve the cancellation trace."""
+        if session.gate_decision != DecisionLevel.YELLOW.value or not session.decision_id:
+            raise ValueError("Only a persisted yellow-gate session can be rejected.")
+        response = self.engine.h_confirm(session.decision_id, "rejected", comment)
+        if response.get("status") != "ok":
+            raise ValueError(response.get("message", "MetaOS rejection failed"))
+        session.confirmation_status = ConfirmationStatus.REJECTED
+        session.status = SessionStatus.CANCELLED
+        self._persist_session_asset(session, access_level)
+        self._trace(session, "agent_session_h_rejected", comment)
+        return session
+
+    def mark_running(self, session: AgentSession, access_level: str = "owner") -> AgentSession:
+        """Record provider process launch only after the adapter has actually launched it."""
+        if session.status != SessionStatus.PREPARED:
+            raise ValueError(f"Cannot mark session running from status {session.status.value}.")
+        if session.gate_decision == DecisionLevel.YELLOW.value and session.confirmation_status != ConfirmationStatus.APPROVED:
+            raise ValueError("Yellow-gate session requires human approval before provider launch.")
+        session.status = SessionStatus.RUNNING
+        self._persist_session_asset(session, access_level)
+        self._trace(session, "agent_session_launched", f"provider={session.provider.value}")
+        return session
 
     def finalize(
         self,
@@ -81,12 +119,13 @@ class AgentRuntimeService:
         access_level: str = "owner",
     ) -> AgentSession:
         """Persist actual outcome and trace it; never infer success from launch."""
+        if session.status not in {SessionStatus.PREPARED, SessionStatus.RUNNING}:
+            raise ValueError(f"Cannot finalize session from status {session.status.value}.")
         session.result_summary = summary
         session.evidence = list(evidence or [])
         session.finalized_at = datetime.now(UTC)
         session.status = SessionStatus.FINALIZED if verification_passed else SessionStatus.FAILED
-        asset = self._persist_session_asset(session, access_level)
-        session.asset_id = asset.asset_id
+        self._persist_session_asset(session, access_level)
         self._trace(
             session,
             "agent_session_finalized" if verification_passed else "agent_session_failed",
@@ -109,6 +148,19 @@ class AgentRuntimeService:
             return True
         return False
 
+    def _save_decision(self, session: AgentSession, level: DecisionLevel, access_level: str, action: str) -> Decision:
+        decision = Decision(
+            h_id=session.h_id or self.engine.current_h.h_id,
+            level=level.value,
+            action=action,
+            description=f"agent_session:{session.session_id} {session.description[:80]}",
+            assets_used=[session.asset_id],
+            access_level=access_level,
+            outcome_pending_review=(level == DecisionLevel.YELLOW),
+        )
+        self.engine.d.save_decision(decision)
+        return decision
+
     def _persist_session_asset(self, session: AgentSession, access_level: str) -> DigitalAsset:
         level = AssetLevel.PRIVATE if access_level in {"owner", "private"} else AssetLevel.SHARED
         asset = DigitalAsset(
@@ -121,11 +173,18 @@ class AgentRuntimeService:
             tags=["agent_session", session.provider.value, session.risk.value, session.mode.value],
         )
         self.engine.d.save_asset(asset)
+        self.engine.d.write_asset_trace(
+            asset.asset_id,
+            asset.level.value if hasattr(asset.level, "value") else str(asset.level),
+            asset.source_h_id,
+            summary=asset.summary,
+        )
+        session.asset_id = asset.asset_id
         return asset
 
     def _trace(self, session: AgentSession, event: str, detail: str) -> None:
         try:
-            self.engine.d.append_trace_log(session.session_id, event, detail)
+            self.engine.d.append_trace_log(session.asset_id or f"session-{session.session_id}", event, detail)
         except Exception:
             pass
 
