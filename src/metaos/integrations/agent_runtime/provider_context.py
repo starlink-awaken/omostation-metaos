@@ -9,6 +9,7 @@ from typing import Any
 
 from .capabilities import requested_mcp_servers, resolve_profile
 from .contracts import AgentSession
+from .mcp_policy import requested_mcp_tools
 
 
 @dataclass(frozen=True)
@@ -27,14 +28,16 @@ def build_provider_context(session: AgentSession, session_asset_path: str = "") 
     """
     profile = resolve_profile(session)
     allowed_mcp = requested_mcp_servers(session)
+    allowed_mcp_tools = requested_mcp_tools(session.capability.requested)
     policy = {
         **profile.to_dict(),
         "allowed_mcp_servers": list(allowed_mcp),
+        "allowed_mcp_tools": {server: list(tools) for server, tools in allowed_mcp_tools.items()},
         "session_status": session.status.value,
         "gate_decision": session.gate_decision,
         "confirmation_status": session.confirmation_status.value,
     }
-    return _context_from_policy(session, policy, profile.name, allowed_mcp, session_asset_path)
+    return _context_from_policy(session, policy, profile.name, allowed_mcp, allowed_mcp_tools, session_asset_path)
 
 
 def build_blocked_provider_context(
@@ -55,12 +58,13 @@ def build_blocked_provider_context(
         "allow_explicit_mcp": False,
         "require_human_confirmation_for_launch": True,
         "allowed_mcp_servers": [],
+        "allowed_mcp_tools": {},
         "session_status": session.status.value,
         "gate_decision": session.gate_decision,
         "confirmation_status": session.confirmation_status.value,
         "reason": reason,
     }
-    return _context_from_policy(session, policy, "blocked", (), session_asset_path)
+    return _context_from_policy(session, policy, "blocked", (), {}, session_asset_path)
 
 
 def _context_from_policy(
@@ -68,6 +72,7 @@ def _context_from_policy(
     policy: dict[str, Any],
     profile_name: str,
     allowed_mcp: tuple[str, ...],
+    allowed_mcp_tools: dict[str, tuple[str, ...]],
     session_asset_path: str,
 ) -> ProviderLaunchContext:
     env = {
@@ -78,10 +83,14 @@ def _context_from_policy(
         "METAOS_GATE_DECISION": session.gate_decision,
         "METAOS_CAPABILITY_PROFILE": profile_name,
         "METAOS_ALLOWED_MCP_JSON": json.dumps(list(allowed_mcp)),
+        "METAOS_ALLOWED_MCP_TOOLS_JSON": json.dumps({server: list(tools) for server, tools in allowed_mcp_tools.items()}),
         "METAOS_CAPABILITY_POLICY_JSON": json.dumps(policy, sort_keys=True),
     }
     if session_asset_path:
         env["METAOS_SESSION_ASSET"] = session_asset_path
+    formatted_tools = ", ".join(
+        f"{server}:{'/'.join(tools)}" for server, tools in allowed_mcp_tools.items()
+    )
     block = "\n".join(
         [
             "# MetaOS Agent Session",
@@ -90,7 +99,7 @@ def _context_from_policy(
             f"- mode: {session.mode.value}",
             f"- gate: {session.gate_decision}",
             f"- capability profile: {profile_name}",
-            f"- explicitly allowed MCP servers: {', '.join(allowed_mcp) if allowed_mcp else '(none)'}",
+            f"- explicitly allowed MCP tools: {formatted_tools or '(none)'}",
             "- Treat this session contract as a boundary, not as permission escalation.",
             "- Do not execute blocked work or unapproved yellow-gate commit work.",
             "- Report produced artifacts and verification outcomes for MetaOS finalization.",
