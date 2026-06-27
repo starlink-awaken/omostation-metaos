@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import shlex
 import sys
 from pathlib import Path
 from typing import Any
@@ -27,18 +26,26 @@ _EXTERNAL_PREFIXES = (
 )
 
 
-def _deny(reason: str) -> dict[str, Any]:
-    return {
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "deny",
-            "permissionDecisionReason": reason,
-        }
+def _decision(kind: str, reason: str = "") -> dict[str, Any]:
+    output: dict[str, Any] = {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": kind,
     }
+    if reason:
+        output["permissionDecisionReason"] = reason
+    return {"hookSpecificOutput": output}
+
+
+def _deny(reason: str) -> dict[str, Any]:
+    return _decision("deny", reason)
+
+
+def _ask(reason: str) -> dict[str, Any]:
+    return _decision("ask", reason)
 
 
 def _allow() -> dict[str, Any]:
-    return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}
+    return _decision("allow")
 
 
 def _path_allowed(raw_path: str, workspace: Path) -> bool:
@@ -52,6 +59,14 @@ def _path_allowed(raw_path: str, workspace: Path) -> bool:
 def _command_is_mutating(command: str) -> bool:
     normalized = " ".join(command.strip().split())
     return normalized.startswith(_MUTATING_GIT_PREFIXES) or normalized.startswith(_EXTERNAL_PREFIXES)
+
+
+def _tool_path(tool_name: str, tool_input: dict[str, Any]) -> str:
+    if tool_name in {"Read", "Write", "Edit"}:
+        return str(tool_input.get("file_path", ""))
+    if tool_name in {"Glob", "Grep"}:
+        return str(tool_input.get("path", ""))
+    return ""
 
 
 def evaluate(payload: dict[str, Any], env: dict[str, str] | None = None) -> dict[str, Any]:
@@ -71,17 +86,29 @@ def evaluate(payload: dict[str, Any], env: dict[str, str] | None = None) -> dict
     workspace = Path(workspace_raw).expanduser().resolve(strict=False)
     mode = str(env.get("METAOS_MODE", policy.get("mode", "observe")))
     gate = str(env.get("METAOS_GATE_DECISION", policy.get("gate_decision", "red")))
+    network = bool(policy.get("network", False))
+    profile_name = str(policy.get("name", "core"))
     session_file = env.get("METAOS_AGENT_SESSION_FILE", "")
     if not session_file or not Path(session_file).exists():
         return _deny("MetaOS running-session projection is missing; refusing the tool call.")
 
     if gate == "red":
         return _deny("MetaOS gate is red; this session is blocked.")
+    if tool_name in {"WebFetch", "WebSearch"} and not network:
+        return _deny("Web access is not enabled by this MetaOS capability profile.")
     if tool_name.startswith("mcp__"):
         parts = tool_name.split("__", 2)
         server = parts[1] if len(parts) > 1 else ""
         if server not in allowed_mcp:
             return _deny(f"MCP server {server!r} is not allowed by this MetaOS capability profile.")
+        if profile_name == "external-commit":
+            return _ask(f"Confirm MCP tool use for allowed server {server!r} in an external-commit session.")
+        return _allow()
+
+    if tool_name in {"Read", "Glob", "Grep"}:
+        requested_path = _tool_path(tool_name, tool_input)
+        if requested_path and not _path_allowed(requested_path, workspace):
+            return _deny(f"{tool_name} target is outside the MetaOS session workspace.")
         return _allow()
 
     if tool_name in {"Write", "Edit"}:
