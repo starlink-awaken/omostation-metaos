@@ -14,7 +14,7 @@ from pathlib import Path
 from metaos.core.engine import SEngine
 from metaos.integrations.agent_runtime.canonical import load_canonical_session
 from metaos.integrations.agent_runtime.cli_support import prepare_payload
-from metaos.integrations.agent_runtime.contracts import AgentSession
+from metaos.integrations.agent_runtime.contracts import AgentSession, high_risk_commit
 from metaos.integrations.agent_runtime.provider_context import build_provider_context
 from metaos.integrations.agent_runtime.service import AgentRuntimeService
 
@@ -77,6 +77,26 @@ def _canonical_context(engine: SEngine, submitted: AgentSession) -> tuple[AgentS
     return session, prepare_payload(session, context)
 
 
+def _bind_approval(runtime: AgentRuntimeService, session: AgentSession, access_level: str) -> AgentSession:
+    """Persist the exact target fingerprint that a human just approved."""
+    if high_risk_commit(session):
+        if not session.target_binding or session.target_binding.is_expired():
+            raise ValueError("High-risk commit target binding is missing, invalid, or expired.")
+        session.approved_target_fingerprint = session.target_binding.fingerprint()
+        runtime._persist_session_asset(session, access_level)
+        runtime._trace(session, "agent_session_target_bound_approval", session.approved_target_fingerprint)
+    return session
+
+
+def _validate_bound_launch(session: AgentSession) -> None:
+    if not high_risk_commit(session):
+        return
+    if not session.target_binding or session.target_binding.is_expired():
+        raise ValueError("High-risk commit target binding is missing, invalid, or expired.")
+    if session.approved_target_fingerprint != session.target_binding.fingerprint():
+        raise ValueError("High-risk commit target differs from the approved target binding.")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     engine = SEngine(data_dir=args.data_dir)
@@ -96,6 +116,7 @@ def main(argv: list[str] | None = None) -> int:
         session = load_canonical_session(engine, submitted)
         if args.command == "approve":
             session = runtime.approve(session, comment=args.comment, access_level=args.access_level)
+            session = _bind_approval(runtime, session, args.access_level)
             _write_session(args.out, session)
             print(json.dumps(session.to_dict(), ensure_ascii=False, indent=2))
             return 0
@@ -105,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(session.to_dict(), ensure_ascii=False, indent=2))
             return 0
         if args.command == "mark-running":
+            _validate_bound_launch(session)
             session = runtime.mark_running(session, access_level=args.access_level)
             _write_session(args.out, session)
             context = build_provider_context(session, session_asset_path=f"asset:{session.asset_id}")
