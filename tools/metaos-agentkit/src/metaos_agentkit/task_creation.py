@@ -33,10 +33,11 @@ def create_task(
     The root runtime remains responsible for canonical validation at prepare.
     This helper only makes the required intent explicit at the CLI boundary.
     """
+    normalized_scope = list(dict.fromkeys(item.strip() for item in scope if item.strip()))
     high_risk_commit = risk in {"R3", "R4"} and mode == "commit"
     binding_values = [target_kind, target, operation]
-    has_partial_binding = any(binding_values) or bool(list(scope)) or expires_in_minutes is not None
-    if has_partial_binding and (not all(binding_values) or not list(scope) or expires_in_minutes is None):
+    has_partial_binding = any(binding_values) or bool(normalized_scope) or expires_in_minutes is not None
+    if has_partial_binding and (not all(binding_values) or not normalized_scope or expires_in_minutes is None):
         raise ValueError("Target binding requires --target-kind, --target, --operation, at least one --scope, and --expires-in-minutes.")
     if high_risk_commit and not has_partial_binding:
         raise ValueError("R3/R4 commit tasks require an explicit target binding and expiry.")
@@ -52,7 +53,6 @@ def create_task(
         allowed_mcp_servers=allowed_mcp_servers,
     )
     payload = json.loads(path.read_text(encoding="utf-8"))
-    normalized_scope = list(dict.fromkeys(item.strip() for item in scope if item.strip()))
     if has_partial_binding:
         payload["target_binding"] = {
             "kind": target_kind.strip(),
