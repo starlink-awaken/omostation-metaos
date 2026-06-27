@@ -12,6 +12,8 @@ from .contracts import (
     OperationalRisk,
     ProviderKind,
     SessionStatus,
+    TargetBinding,
+    high_risk_commit,
 )
 from .service import AgentRuntimeService
 
@@ -25,5 +27,7 @@ __all__ = [
     "PROFILES",
     "ProviderKind",
     "SessionStatus",
+    "TargetBinding",
+    "high_risk_commit",
     "resolve_profile",
 ]
