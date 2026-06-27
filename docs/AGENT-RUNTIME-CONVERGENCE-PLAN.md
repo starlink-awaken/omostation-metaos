@@ -1,26 +1,37 @@
 # Agent Runtime Convergence Plan
 
-## Phase A — completed in this change
+## Phase A — completed
 
 - Canonical `AgentSession` contract.
-- Separation of operational risk, execution mode, gate outcome, and lifecycle status.
+- Separation of operational risk, execution mode, Gate outcome, confirmation, and lifecycle status.
 - `AgentRuntimeService.prepare/finalize` connected to `DecisionGate`, `DLayer`, `Decision`, and Trace.
 - `metaos-agent` CLI bridge.
 - Provider context projection that grants no additional authority.
 
-## Phase B — next change
+## Phase B — completed
 
-- Move AgentKit's session creation from legacy task-envelope JSON to `metaos-agent prepare`.
-- Have AgentKit reject provider execution when the prepared session is blocked.
-- Write provider-local session files only as projections of canonical assets.
-- Implement explicit `metaos-agent finalize` handoff after provider result collection.
+- AgentKit session creation uses the canonical AgentSession shape rather than legacy task-envelope JSON.
+- AgentKit refuses Provider execution for blocked sessions.
+- Provider-local files are projections; canonical session state is persisted as a MetaOS asset.
+- Explicit `metaos-agent finalize` handoff records verification evidence after Provider work.
+- `metaos-agent context` and canonical asset loading prevent lifecycle transitions from trusting altered local projections.
 
-## Phase C — enforcement
+## Phase C — completed baseline
 
-- Map capability profiles to Codex sandbox/approval configuration.
-- Map capability profiles to Claude Code permissions/hooks.
-- Map allowed MCP servers/tools and Docker mounts from the same profile.
-- Add adapter contract tests against installed provider versions.
+- Capability profiles are validated by the MetaOS runtime before Gate execution.
+- Codex receives session-scoped sandbox, approval, workspace network, MCP-disable, and protected-argument controls.
+- Claude Code receives a generated session settings overlay, sandbox constraints, secret-path denies, MCP deny entries, and a PreToolUse capability hook.
+- R2 and high-risk stage profiles use detached Git worktrees so uncommitted user files are not copied into the Agent workspace.
+- Explicit MCP requests are deny-by-default and subject to Profile validation.
+- Adapter smoke tests and a GitHub Actions workflow validate the standalone AgentKit package.
+
+## Phase D — remaining enforcement work
+
+- Add a dedicated container executor before exposing Docker socket, Docker mounts, or container-management MCP tools.
+- Add provider-version smoke tests against the locally installed Codex and Claude Code versions.
+- Add OS-level path ACL validation where supported by the host platform.
+- Add canonical session integrity signatures or database-backed optimistic version checks for multi-process concurrency.
+- Move capability profile configuration into a user-editable, schema-validated policy file once the built-ins stabilize.
 
 ## Non-goals
 
