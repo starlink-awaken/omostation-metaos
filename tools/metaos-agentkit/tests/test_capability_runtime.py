@@ -67,7 +67,7 @@ def test_claude_hook_denies_unapproved_mcp_stage_push_web_and_outside_write(tmp_
         "METAOS_AGENT_SESSION_FILE": str(session),
         "METAOS_MODE": "stage",
         "METAOS_GATE_DECISION": "green",
-        "METAOS_ALLOWED_MCP_JSON": '["repo-index"]',
+        "METAOS_ALLOWED_MCP_TOOLS_JSON": '{"repo-index":["*"]}',
         "METAOS_CAPABILITY_POLICY_JSON": json.dumps({"name": "repo-stage", "network": False}),
     }
 
@@ -88,7 +88,7 @@ def test_claude_hook_denies_unapproved_mcp_stage_push_web_and_outside_write(tmp_
     assert denied_outside_read["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
-def test_claude_hook_asks_for_each_allowed_external_commit_mcp_call(tmp_path: Path) -> None:
+def test_claude_hook_allows_only_the_named_mcp_tool_and_asks_for_external_commit(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     session = workspace / "running-session.json"
@@ -98,13 +98,15 @@ def test_claude_hook_asks_for_each_allowed_external_commit_mcp_call(tmp_path: Pa
         "METAOS_AGENT_SESSION_FILE": str(session),
         "METAOS_MODE": "commit",
         "METAOS_GATE_DECISION": "green",
-        "METAOS_ALLOWED_MCP_JSON": '["calendar"]',
+        "METAOS_ALLOWED_MCP_TOOLS_JSON": '{"calendar":["create_event"]}',
         "METAOS_CAPABILITY_POLICY_JSON": json.dumps({"name": "external-commit", "network": False}),
     }
 
-    result = evaluate({"tool_name": "mcp__calendar__create_event", "tool_input": {}}, env)
+    allowed = evaluate({"tool_name": "mcp__calendar__create_event", "tool_input": {}}, env)
+    denied = evaluate({"tool_name": "mcp__calendar__delete_event", "tool_input": {}}, env)
 
-    assert result["hookSpecificOutput"]["permissionDecision"] == "ask"
+    assert allowed["hookSpecificOutput"]["permissionDecision"] == "ask"
+    assert denied["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
 def test_claude_hook_allows_stage_write_inside_isolated_workspace(tmp_path: Path) -> None:
@@ -118,7 +120,7 @@ def test_claude_hook_allows_stage_write_inside_isolated_workspace(tmp_path: Path
         "METAOS_AGENT_SESSION_FILE": str(session),
         "METAOS_MODE": "stage",
         "METAOS_GATE_DECISION": "green",
-        "METAOS_ALLOWED_MCP_JSON": "[]",
+        "METAOS_ALLOWED_MCP_TOOLS_JSON": "{}",
         "METAOS_CAPABILITY_POLICY_JSON": json.dumps({"name": "repo-stage", "network": False}),
     }
 
