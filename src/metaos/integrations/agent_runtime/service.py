@@ -8,6 +8,7 @@ from typing import Any
 
 from metaos.core.types import AssetLevel, Decision, DecisionLevel, DigitalAsset, Task
 
+from .capabilities import validate_capability_profile
 from .contracts import (
     AgentSession,
     ConfirmationStatus,
@@ -36,7 +37,7 @@ class AgentRuntimeService:
         A successful return with `prepared` means launch is permitted. It does
         not mean the provider process has started.
         """
-        violations = validate_session_policy(session)
+        violations = [*validate_session_policy(session), *validate_capability_profile(session)]
         if violations:
             session.status = SessionStatus.BLOCKED
             session.gate_decision = DecisionLevel.RED.value
@@ -205,6 +206,7 @@ class AgentRuntimeService:
                 "risk": session.risk.value,
                 "mode": session.mode.value,
                 "capability_profile": session.capability.profile,
+                "capability_requested": session.capability.requested,
                 "scope": session.scope,
                 "exclusions": session.exclusions,
                 "success_criteria": session.success_criteria,
