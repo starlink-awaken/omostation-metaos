@@ -7,18 +7,15 @@ import json
 import sys
 from pathlib import Path
 
-from .service import (
-    Plan,
+from .service import Plan, create_task, install_global, install_local, normalize_providers, status, uninstall_global
+from .task_actions import (
     approve_task,
-    create_task,
+    archive_task,
+    cleanup_tasks,
     finalize_task,
-    install_global,
-    install_local,
-    launch,
-    normalize_providers,
+    launch_task,
+    list_tasks,
     reject_task,
-    status,
-    uninstall_global,
 )
 
 
@@ -64,22 +61,40 @@ def _parser() -> argparse.ArgumentParser:
     )
     p_new.add_argument("--path", type=Path, default=Path.cwd())
 
-    p_approve = task_sub.add_parser("approve", help="Approve the latest pending yellow-gate session")
+    p_list = task_sub.add_parser("list", help="List active tasks and, optionally, archived tasks")
+    p_list.add_argument("--all", action="store_true", help="include archived tasks")
+    p_list.add_argument("--path", type=Path, default=Path.cwd())
+
+    p_approve = task_sub.add_parser("approve", help="Approve a pending yellow-gate session")
+    p_approve.add_argument("--task", help="task identifier; mandatory for R3/R4 commit tasks")
     p_approve.add_argument("--comment", default="")
     p_approve.add_argument("--path", type=Path, default=Path.cwd())
 
-    p_reject = task_sub.add_parser("reject", help="Reject the latest pending yellow-gate session")
+    p_reject = task_sub.add_parser("reject", help="Reject a pending yellow-gate session")
+    p_reject.add_argument("--task", help="task identifier; mandatory for R3/R4 commit tasks")
     p_reject.add_argument("--comment", default="")
     p_reject.add_argument("--path", type=Path, default=Path.cwd())
 
     p_finalize = task_sub.add_parser("finalize", help="Record a verified or failed provider outcome")
+    p_finalize.add_argument("--task", help="task identifier; mandatory for R3/R4 commit tasks")
     p_finalize.add_argument("--summary", required=True)
     p_finalize.add_argument("--evidence", action="append", default=[])
     p_finalize.add_argument("--verification-passed", action="store_true")
     p_finalize.add_argument("--path", type=Path, default=Path.cwd())
 
+    p_archive = task_sub.add_parser("archive", help="Archive one terminal task and remove its managed worktree")
+    p_archive.add_argument("--task", required=True, help="terminal task identifier")
+    p_archive.add_argument("--path", type=Path, default=Path.cwd())
+    p_archive.add_argument("--apply", action="store_true", help="perform archive; default is preview")
+
+    p_cleanup = task_sub.add_parser("cleanup", help="Archive terminal tasks older than a retention window")
+    p_cleanup.add_argument("--older-than", type=int, default=14, metavar="DAYS")
+    p_cleanup.add_argument("--path", type=Path, default=Path.cwd())
+    p_cleanup.add_argument("--apply", action="store_true", help="perform cleanup; default is preview")
+
     p_launch = sub.add_parser("launch", help="Prepare through MetaOS, then launch a provider")
     p_launch.add_argument("provider", choices=["codex", "claude"])
+    p_launch.add_argument("--task", help="task identifier; mandatory for R3/R4 commit tasks")
     p_launch.add_argument("--mode", choices=["observe", "propose", "stage", "commit"])
     p_launch.add_argument("--path", type=Path, default=Path.cwd())
     p_launch.add_argument("--execute", action="store_true", help="gate and run provider; default is preview")
@@ -140,31 +155,48 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 )
                 return 0
+            if args.task_command == "list":
+                print(json.dumps(list_tasks(project=project, include_archived=args.all), ensure_ascii=False, indent=2))
+                return 0
             if args.task_command == "approve":
-                print(approve_task(project=project, home=home, comment=args.comment))
+                print(approve_task(project=project, home=home, task_id=args.task, comment=args.comment))
                 return 0
             if args.task_command == "reject":
-                print(reject_task(project=project, home=home, comment=args.comment))
+                print(reject_task(project=project, home=home, task_id=args.task, comment=args.comment))
                 return 0
             if args.task_command == "finalize":
                 print(
                     finalize_task(
                         project=project,
                         home=home,
+                        task_id=args.task,
                         summary=args.summary,
                         evidence=args.evidence,
                         verification_passed=args.verification_passed,
                     )
                 )
                 return 0 if args.verification_passed else 4
+            if args.task_command == "archive":
+                print(json.dumps(archive_task(project=project, home=home, task_id=args.task, apply=args.apply), ensure_ascii=False, indent=2))
+                return 0
+            if args.task_command == "cleanup":
+                print(
+                    json.dumps(
+                        cleanup_tasks(project=project, home=home, older_than_days=args.older_than, apply=args.apply),
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                )
+                return 0
         if args.command == "launch":
             pass_through = unknown
             if pass_through[:1] == ["--"]:
                 pass_through = pass_through[1:]
-            return launch(
+            return launch_task(
                 provider=args.provider,
                 project=args.path.expanduser(),
                 home=home,
+                task_id=args.task,
                 mode=args.mode,
                 provider_args=pass_through,
                 execute=args.execute,
