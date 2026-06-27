@@ -356,8 +356,16 @@ def launch(*, provider: str, project: Path, home: Path, mode: str | None, provid
         if session.get("status") != "prepared":
             raise ValueError(f"Session must be prepared before launch; current status is {session.get('status')}.")
         prepared_file = session_file
-        prepared_session = session
-        context = _load_prepared_context(prepared_file)
+        context_result = _run_bridge(
+            project=project,
+            home=home,
+            arguments=["context", "--session-file", str(prepared_file)],
+        )
+        if context_result.returncode != 0:
+            _emit_bridge_result(context_result)
+            return context_result.returncode
+        context = _parse_bridge_payload(context_result.stdout)
+        prepared_session = context["session"]
     else:
         prepared_file = session_file.parent / "prepared-session.json"
         prepared_result = _run_bridge(
@@ -368,14 +376,12 @@ def launch(*, provider: str, project: Path, home: Path, mode: str | None, provid
         if prepared_result.returncode != 0:
             _emit_bridge_result(prepared_result)
             return prepared_result.returncode
-        payload = _parse_bridge_payload(prepared_result.stdout)
-        prepared_session = payload["session"]
+        context = _parse_bridge_payload(prepared_result.stdout)
+        prepared_session = context["session"]
+        _save_prepared_context(prepared_file, context)
         if prepared_session["status"] == "blocked":
-            _save_prepared_context(prepared_file, payload)
             _emit_bridge_result(prepared_result)
             return 3
-        _save_prepared_context(prepared_file, payload)
-        context = payload
 
     capability_policy = context.get("capability_policy")
     launch_context = context.get("launch_context") or {}
@@ -444,6 +450,8 @@ def finalize_task(
 def _default_profile(*, risk: str, mode: str) -> str:
     if risk == "R2" and mode == "stage":
         return "repo-stage"
+    if risk in {"R3", "R4"} and mode == "stage":
+        return "high-risk-stage"
     if risk in {"R3", "R4"} and mode == "commit":
         return "external-commit"
     if risk == "R1":
@@ -475,16 +483,6 @@ def _save_prepared_context(session_file: Path, payload: dict) -> Path:
     return target
 
 
-def _load_prepared_context(session_file: Path) -> dict:
-    target = _context_path(session_file)
-    if not target.exists():
-        raise ValueError("Prepared session has no persisted MetaOS context. Create a new task.")
-    try:
-        return json.loads(target.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise ValueError("Prepared MetaOS context is invalid; create a new task.") from exc
-
-
 def _validate_provider_args(provider: str, provider_args: list[str]) -> None:
     blocked = {
         "codex": {
@@ -499,12 +497,18 @@ def _validate_provider_args(provider: str, provider_args: list[str]) -> None:
             "-p",
             "--permissions-profile",
             "-P",
+            "--full-auto",
+            "--search",
             "--dangerously-bypass-approvals-and-sandbox",
             "--yolo",
         },
         "claude": {
             "--settings",
             "--permission-mode",
+            "--mcp-config",
+            "--add-dir",
+            "--allowedTools",
+            "--disallowedTools",
             "--dangerously-skip-permissions",
             "--bypass-permissions",
         },
