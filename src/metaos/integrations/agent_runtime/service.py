@@ -17,7 +17,11 @@ from .contracts import (
     SessionStatus,
     validate_session_policy,
 )
-from .provider_context import ProviderLaunchContext, build_provider_context
+from .provider_context import (
+    ProviderLaunchContext,
+    build_blocked_provider_context,
+    build_provider_context,
+)
 
 
 class AgentRuntimeService:
@@ -48,7 +52,11 @@ class AgentRuntimeService:
             session.decision_id = decision.decision_id
             self._persist_session_asset(session, access_level)
             self._trace(session, "agent_session_blocked", session.gate_reason)
-            return session, build_provider_context(session, session_asset_path=f"asset:{session.asset_id}")
+            return session, build_blocked_provider_context(
+                session,
+                session_asset_path=f"asset:{session.asset_id}",
+                reason=session.gate_reason,
+            )
 
         task = Task(
             task_id=session.task_id,
