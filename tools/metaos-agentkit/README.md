@@ -41,12 +41,13 @@ uv run --directory /path/to/omostation-metaos/tools/metaos-agentkit \
   metaos-agentkit init --local --provider codex,claude --apply
 
 # R2 stage defaults to repo-stage and creates a detached worktree on --execute.
-TASK=$(uv run --directory /path/to/omostation-metaos/tools/metaos-agentkit \
+TASK_FILE=$(uv run --directory /path/to/omostation-metaos/tools/metaos-agentkit \
   metaos-agentkit task new "Fix login TypeScript error" --risk R2 --mode stage)
+TASK_ID=$(basename "$(dirname "$TASK_FILE")")
 
 metaos-agentkit task list
-metaos-agentkit launch codex --task "${TASK##*/}" --mode stage --execute
-metaos-agentkit task finalize --task "${TASK##*/}" \
+metaos-agentkit launch codex --task "$TASK_ID" --mode stage --execute
+metaos-agentkit task finalize --task "$TASK_ID" \
   --summary "Focused tests passed" \
   --evidence "pytest tests/auth -q" \
   --verification-passed
