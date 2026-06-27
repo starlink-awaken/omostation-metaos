@@ -22,7 +22,14 @@ from .service import (
 )
 
 
-PROFILE_NAMES = ["core", "repo-read", "research-read", "repo-stage", "external-commit"]
+PROFILE_NAMES = [
+    "core",
+    "repo-read",
+    "research-read",
+    "repo-stage",
+    "high-risk-stage",
+    "external-commit",
+]
 
 
 def _parser() -> argparse.ArgumentParser:
