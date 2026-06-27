@@ -14,9 +14,10 @@ from pathlib import Path
 from typing import Any
 
 from metaos.core.engine import SEngine
+from metaos.core.types import DecisionLevel
 from metaos.integrations.agent_runtime.canonical import load_canonical_session
 from metaos.integrations.agent_runtime.cli_support import prepare_payload
-from metaos.integrations.agent_runtime.contracts import AgentSession, high_risk_commit
+from metaos.integrations.agent_runtime.contracts import AgentSession, ConfirmationStatus, SessionStatus, high_risk_commit
 from metaos.integrations.agent_runtime.provider_context import build_provider_context
 from metaos.integrations.agent_runtime.service import AgentRuntimeService
 
@@ -81,6 +82,28 @@ def _canonical_context(engine: SEngine, submitted: AgentSession) -> tuple[AgentS
     return session, prepare_payload(session, context)
 
 
+def _require_high_risk_confirmation(runtime: AgentRuntimeService, session: AgentSession, access_level: str) -> AgentSession:
+    """Elevate every R3/R4 commit to a target-bound confirmation checkpoint.
+
+    A green dynamic Gate means no additional blocker was found. It does not
+    replace the explicit, short-lived human authorization required to execute
+    an external high-impact target binding.
+    """
+    if not high_risk_commit(session) or session.status != SessionStatus.PREPARED:
+        return session
+    session.status = SessionStatus.BLOCKED
+    session.gate_decision = DecisionLevel.YELLOW.value
+    session.confirmation_status = ConfirmationStatus.PENDING
+    suffix = "explicit target-bound human confirmation required before high-risk commit launch"
+    session.gate_reason = f"{session.gate_reason}; {suffix}" if session.gate_reason else suffix
+    runtime._persist_session_asset(session, access_level)
+    decision = runtime._save_decision(session, DecisionLevel.YELLOW, access_level, action="blocked")
+    session.decision_id = decision.decision_id
+    runtime._persist_session_asset(session, access_level)
+    runtime._trace(session, "agent_session_confirmation_required", suffix)
+    return session
+
+
 def _bind_approval(runtime: AgentRuntimeService, session: AgentSession, access_level: str) -> AgentSession:
     """Persist the exact target fingerprint that a human just approved."""
     if high_risk_commit(session):
@@ -137,6 +160,8 @@ def main(argv: list[str] | None = None) -> int:
         submitted = _read_session(args.session_file)
         if args.command == "prepare":
             session, context = runtime.prepare(submitted, access_level=args.access_level)
+            session = _require_high_risk_confirmation(runtime, session, args.access_level)
+            context = build_provider_context(session, session_asset_path=f"asset:{session.asset_id}")
             _write_session(args.out, session)
             print(json.dumps(prepare_payload(session, context), ensure_ascii=False, indent=2))
             return 0 if session.status.value != "blocked" else 3
