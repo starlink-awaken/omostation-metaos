@@ -6,12 +6,12 @@ import json
 import os
 import subprocess
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from . import service
 from .capability_runtime import render_plan
+from .evidence import capture_finalization_evidence
 from .task_store import (
     archive_task as archive_task_projection,
     cleanup_terminal_tasks,
@@ -76,7 +76,18 @@ def finalize_task(
 ) -> Path:
     record = resolve_task_record(project, task_id=task_id)
     output = record.directory / "final-session.json"
-    args = ["finalize", "--session-file", str(record.session_file), "--out", str(output), "--summary", summary]
+    evidence_file = capture_finalization_evidence(record.directory)
+    args = [
+        "finalize",
+        "--session-file",
+        str(record.session_file),
+        "--out",
+        str(output),
+        "--summary",
+        summary,
+        "--evidence-file",
+        str(evidence_file),
+    ]
     for item in evidence:
         args.extend(["--evidence", item])
     if verification_passed:
