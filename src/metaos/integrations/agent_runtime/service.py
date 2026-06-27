@@ -66,19 +66,15 @@ class AgentRuntimeService:
         self._persist_session_asset(session, access_level)
         decision = self._save_decision(session, level, access_level, action="blocked" if session.status == SessionStatus.BLOCKED else "prepared")
         session.decision_id = decision.decision_id
-        if level == DecisionLevel.YELLOW:
-            self.engine._pending_yellow.append(decision)
         self._persist_session_asset(session, access_level)
         self._trace(session, "agent_session_prepared", f"gate={level.value}; status={session.status.value}")
         return session, build_provider_context(session, session_asset_path=f"asset:{session.asset_id}")
 
     def approve(self, session: AgentSession, *, comment: str = "", access_level: str = "owner") -> AgentSession:
-        """Apply the existing MetaOS human-confirmation path to a yellow session."""
+        """Persist human approval for a yellow session across CLI processes."""
         if session.gate_decision != DecisionLevel.YELLOW.value or not session.decision_id:
             raise ValueError("Only a persisted yellow-gate session can be approved.")
-        response = self.engine.h_confirm(session.decision_id, "approved", comment)
-        if response.get("status") != "ok":
-            raise ValueError(response.get("message", "MetaOS confirmation failed"))
+        self._save_confirmation_decision(session, access_level, action="approved")
         session.confirmation_status = ConfirmationStatus.APPROVED
         session.status = SessionStatus.PREPARED
         self._persist_session_asset(session, access_level)
@@ -86,12 +82,10 @@ class AgentRuntimeService:
         return session
 
     def reject(self, session: AgentSession, *, comment: str = "", access_level: str = "owner") -> AgentSession:
-        """Reject a pending yellow session and preserve the cancellation trace."""
+        """Persist human rejection for a yellow session across CLI processes."""
         if session.gate_decision != DecisionLevel.YELLOW.value or not session.decision_id:
             raise ValueError("Only a persisted yellow-gate session can be rejected.")
-        response = self.engine.h_confirm(session.decision_id, "rejected", comment)
-        if response.get("status") != "ok":
-            raise ValueError(response.get("message", "MetaOS rejection failed"))
+        self._save_confirmation_decision(session, access_level, action="rejected")
         session.confirmation_status = ConfirmationStatus.REJECTED
         session.status = SessionStatus.CANCELLED
         self._persist_session_asset(session, access_level)
@@ -160,6 +154,19 @@ class AgentRuntimeService:
         )
         self.engine.d.save_decision(decision)
         return decision
+
+    def _save_confirmation_decision(self, session: AgentSession, access_level: str, action: str) -> None:
+        decision = Decision(
+            decision_id=session.decision_id,
+            h_id=session.h_id or self.engine.current_h.h_id,
+            level=DecisionLevel.YELLOW.value,
+            action=action,
+            description=f"agent_session:{session.session_id} {session.description[:80]}",
+            assets_used=[session.asset_id],
+            access_level=access_level,
+            outcome_pending_review=False,
+        )
+        self.engine.d.save_decision(decision)
 
     def _persist_session_asset(self, session: AgentSession, access_level: str) -> DigitalAsset:
         level = AssetLevel.PRIVATE if access_level in {"owner", "private"} else AssetLevel.SHARED
