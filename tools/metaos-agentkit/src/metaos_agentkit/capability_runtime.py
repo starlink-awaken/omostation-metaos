@@ -49,7 +49,7 @@ def allowed_mcp_servers(policy: dict[str, Any]) -> tuple[str, ...]:
 
 
 def ensure_stage_worktree(*, project: Path, metaos_home: Path, session_id: str) -> Path:
-    """Create or reuse a detached Git worktree for an R2 stage session.
+    """Create or reuse a detached Git worktree for an isolated stage session.
 
     The worktree is outside the original checkout and starts at HEAD. Existing
     uncommitted work stays in the user's checkout and is intentionally not
@@ -112,12 +112,13 @@ def render_plan(
     )
 
     if provider == "codex":
-        disabled = tuple(sorted(set(discover_codex_mcp_servers(home=Path.home())) - set(allowed)))
+        disabled = tuple(sorted(set(discover_codex_mcp_servers(home=Path.home(), project=project)) - set(allowed)))
         prefix = render_codex_command(
             policy=policy,
             workspace=working_directory,
             extra_writable=(),
             disabled_mcp_servers=disabled,
+            allowed_mcp_servers=allowed,
         )
         policy_file = runtime_dir / "codex-policy.json"
         policy_file.write_text(
@@ -182,8 +183,10 @@ def render_codex_command(
     workspace: Path,
     extra_writable: tuple[Path, ...],
     disabled_mcp_servers: tuple[str, ...],
+    allowed_mcp_servers: tuple[str, ...] = (),
 ) -> list[str]:
     """Return enforced Codex CLI arguments without shell quoting."""
+    network = bool(policy.get("network"))
     command = [
         "codex",
         "--cd",
@@ -193,16 +196,20 @@ def render_codex_command(
         "--ask-for-approval",
         str(policy["codex_approval"]),
         "--config",
-        f"sandbox_workspace_write.network_access={'true' if policy.get('network') else 'false'}",
+        f"sandbox_workspace_write.network_access={'true' if network else 'false'}",
         "--config",
         "sandbox_workspace_write.exclude_slash_tmp=true",
         "--config",
         "sandbox_workspace_write.exclude_tmpdir_env_var=true",
+        "--config",
+        f"tools.web_search={'true' if network else 'false'}",
     ]
     for path in extra_writable:
         command.extend(["--add-dir", str(path)])
     for server in disabled_mcp_servers:
         command.extend(["--config", f'mcp_servers.{_toml_key(server)}.enabled=false'])
+    for server in allowed_mcp_servers:
+        command.extend(["--config", f'mcp_servers.{_toml_key(server)}.default_tools_approval_mode="prompt"'])
     return command
 
 
@@ -216,31 +223,51 @@ def render_claude_settings(
     """Render a session-only Claude settings overlay.
 
     Deny rules are intentional because Claude merges allow arrays across
-    scopes. This overlay therefore blocks sensitive paths, explicitly denied
-    MCP servers, destructive Git commands in stage/read modes, and tool calls
-    rejected by the PreToolUse hook.
+    scopes. The overlay blocks sensitive reads, provider web tools when the
+    profile has no network, disabled MCP servers, bypass-permissions mode, and
+    destructive Git commands in stage/read modes. The PreToolUse hook applies
+    the same boundary to tool calls that escape static permission patterns.
     """
-    mode = str(policy.get("name", "core"))
+    profile_name = str(policy.get("name", "core"))
+    network = bool(policy.get("network"))
     deny = [
+        "Read(~/.ssh/**)",
+        "Read(~/.gnupg/**)",
+        "Read(~/.aws/**)",
+        "Read(~/.config/gcloud/**)",
+        "Read(~/.kube/**)",
+        "Read(~/.local/share/keyrings/**)",
         "Read(./.env)",
         "Read(./.env.*)",
         "Read(./secrets/**)",
         "Read(./config/credentials.json)",
     ]
+    if not network:
+        deny.extend(["WebFetch", "WebSearch"])
     deny.extend(f"mcp__{server}__*" for server in disabled_mcp_servers)
-    if mode != "external-commit":
+    if profile_name != "external-commit":
         deny.extend(
             [
                 "Bash(git commit *)",
                 "Bash(git push *)",
                 "Bash(git tag *)",
+                "Bash(git reset --hard *)",
+                "Bash(git clean *)",
                 "Bash(gh pr create *)",
                 "Bash(gh pr merge *)",
                 "Bash(gh release create *)",
+                "Bash(curl *)",
+                "Bash(wget *)",
             ]
         )
     return {
-        "permissions": {"deny": deny},
+        "permissions": {
+            "defaultMode": "plan" if profile_name in {"core", "repo-read", "research-read"} else "default",
+            "disableBypassPermissionsMode": "disable",
+            "deny": deny,
+        },
+        "disableClaudeAiConnectors": True,
+        "disabledMcpjsonServers": list(disabled_mcp_servers),
         "sandbox": {
             "enabled": True,
             "failIfUnavailable": True,
@@ -271,16 +298,19 @@ def render_claude_settings(
     }
 
 
-def discover_codex_mcp_servers(*, home: Path) -> set[str]:
-    config = home / ".codex" / "config.toml"
-    if not config.exists():
-        return set()
-    try:
-        payload = tomllib.loads(config.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError):
-        return set()
-    servers = payload.get("mcp_servers") or {}
-    return {str(name) for name in servers if isinstance(name, str)}
+def discover_codex_mcp_servers(*, home: Path, project: Path) -> set[str]:
+    names: set[str] = set()
+    for config in (home / ".codex" / "config.toml", project / ".codex" / "config.toml"):
+        if not config.exists():
+            continue
+        try:
+            payload = tomllib.loads(config.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError):
+            continue
+        servers = payload.get("mcp_servers") or {}
+        if isinstance(servers, dict):
+            names.update(str(name) for name in servers)
+    return names
 
 
 def discover_claude_mcp_servers(*, home: Path, project: Path) -> set[str]:
@@ -306,7 +336,7 @@ def _git_root(project: Path) -> Path:
         check=False,
     )
     if result.returncode != 0:
-        raise ValueError("The repo-stage capability profile requires a Git worktree.")
+        raise ValueError("The stage capability profiles require a Git worktree.")
     return Path(result.stdout.strip()).resolve()
 
 
