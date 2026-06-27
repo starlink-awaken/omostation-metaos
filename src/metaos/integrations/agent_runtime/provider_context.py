@@ -34,13 +34,49 @@ def build_provider_context(session: AgentSession, session_asset_path: str = "") 
         "gate_decision": session.gate_decision,
         "confirmation_status": session.confirmation_status.value,
     }
+    return _context_from_policy(session, policy, profile.name, allowed_mcp, session_asset_path)
+
+
+def build_blocked_provider_context(
+    session: AgentSession,
+    *,
+    session_asset_path: str = "",
+    reason: str = "capability policy is invalid",
+) -> ProviderLaunchContext:
+    """Return a projection that is safe to serialize but cannot authorize launch."""
+    policy = {
+        "name": "blocked",
+        "allowed_risks": [],
+        "allowed_modes": [],
+        "codex_sandbox": "read-only",
+        "codex_approval": "on-request",
+        "network": False,
+        "isolate_git_worktree": False,
+        "allow_explicit_mcp": False,
+        "require_human_confirmation_for_launch": True,
+        "allowed_mcp_servers": [],
+        "session_status": session.status.value,
+        "gate_decision": session.gate_decision,
+        "confirmation_status": session.confirmation_status.value,
+        "reason": reason,
+    }
+    return _context_from_policy(session, policy, "blocked", (), session_asset_path)
+
+
+def _context_from_policy(
+    session: AgentSession,
+    policy: dict[str, Any],
+    profile_name: str,
+    allowed_mcp: tuple[str, ...],
+    session_asset_path: str,
+) -> ProviderLaunchContext:
     env = {
         "METAOS_AGENT_SESSION_ID": session.session_id,
         "METAOS_TASK_ID": session.task_id,
         "METAOS_MODE": session.mode.value,
         "METAOS_RISK": session.risk.value,
         "METAOS_GATE_DECISION": session.gate_decision,
-        "METAOS_CAPABILITY_PROFILE": profile.name,
+        "METAOS_CAPABILITY_PROFILE": profile_name,
         "METAOS_ALLOWED_MCP_JSON": json.dumps(list(allowed_mcp)),
         "METAOS_CAPABILITY_POLICY_JSON": json.dumps(policy, sort_keys=True),
     }
@@ -53,7 +89,7 @@ def build_provider_context(session: AgentSession, session_asset_path: str = "") 
             f"- risk: {session.risk.value}",
             f"- mode: {session.mode.value}",
             f"- gate: {session.gate_decision}",
-            f"- capability profile: {profile.name}",
+            f"- capability profile: {profile_name}",
             f"- explicitly allowed MCP servers: {', '.join(allowed_mcp) if allowed_mcp else '(none)'}",
             "- Treat this session contract as a boundary, not as permission escalation.",
             "- Do not execute blocked work or unapproved yellow-gate commit work.",
