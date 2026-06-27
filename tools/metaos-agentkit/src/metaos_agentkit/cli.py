@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from .service import Plan, create_task, install_global, install_local, normalize_providers, status, uninstall_global
+from .service import Plan, install_global, install_local, normalize_providers, status, uninstall_global
 from .task_actions import (
     approve_task,
     archive_task,
@@ -17,6 +17,7 @@ from .task_actions import (
     list_tasks,
     reject_task,
 )
+from .task_creation import create_task
 
 
 PROFILE_NAMES = [
@@ -59,6 +60,15 @@ def _parser() -> argparse.ArgumentParser:
         metavar="SERVER",
         help="explicit MCP server request; only allowed by research-read or external-commit profiles",
     )
+    p_new.add_argument("--target-kind", default="", help="high-risk target type, e.g. calendar_event or github_pull_request")
+    p_new.add_argument("--target", default="", help="exact high-risk external target")
+    p_new.add_argument("--operation", default="", help="exact requested operation on the target")
+    p_new.add_argument("--scope", action="append", default=[], help="approved target scope; repeatable")
+    p_new.add_argument("--expires-in-minutes", type=int, help="high-risk target binding lifetime")
+    p_new.add_argument("--success-criterion", action="append", default=[], help="explicit success criterion; repeatable")
+    p_new.add_argument("--verify-command", action="append", default=[], help="planned verification command; repeatable")
+    p_new.add_argument("--verify-expect", action="append", default=[], help="expected verification outcome; repeatable")
+    p_new.add_argument("--rollback", action="append", default=[], help="rollback or containment instruction; repeatable")
     p_new.add_argument("--path", type=Path, default=Path.cwd())
 
     p_list = task_sub.add_parser("list", help="List active tasks and, optionally, archived tasks")
@@ -152,6 +162,15 @@ def main(argv: list[str] | None = None) -> int:
                         mode=args.mode,
                         capability_profile=_inferred_profile(args.risk, args.mode, args.profile),
                         allowed_mcp_servers=args.allow_mcp,
+                        target_kind=args.target_kind,
+                        target=args.target,
+                        operation=args.operation,
+                        scope=args.scope,
+                        expires_in_minutes=args.expires_in_minutes,
+                        success_criteria=args.success_criterion,
+                        verification_commands=args.verify_command,
+                        verification_expected_outcomes=args.verify_expect,
+                        rollback_or_containment=args.rollback,
                     )
                 )
                 return 0
