@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Iterable
 from uuid import uuid4
 
+from .capability_runtime import ProviderRuntimePlan, render_plan
 from .templates import CLAUDE_BLOCK, CODEX_BLOCK, CORE_POLICY, MARKER_BEGIN, MARKER_END, SKILLS
 
 
@@ -230,7 +231,16 @@ def _has_marker(path: Path) -> bool:
     return path.exists() and MARKER_BEGIN in path.read_text(encoding="utf-8")
 
 
-def create_task(*, project: Path, description: str, risk: str, mode: str, apply: bool = True) -> Path:
+def create_task(
+    *,
+    project: Path,
+    description: str,
+    risk: str,
+    mode: str,
+    capability_profile: str | None = None,
+    allowed_mcp_servers: Iterable[str] = (),
+    apply: bool = True,
+) -> Path:
     valid_risks = {"R0", "R1", "R2", "R3", "R4"}
     valid_modes = {"observe", "propose", "stage", "commit"}
     if risk not in valid_risks:
@@ -239,6 +249,8 @@ def create_task(*, project: Path, description: str, risk: str, mode: str, apply:
         raise ValueError(f"mode must be one of {', '.join(sorted(valid_modes))}")
     task_id = f"task-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
     task_dir = project_home(project.resolve()) / "tasks" / task_id
+    profile = capability_profile or _default_profile(risk=risk, mode=mode)
+    requested = [f"mcp:{name}" for name in dict.fromkeys(name.strip() for name in allowed_mcp_servers if name.strip())]
     payload = {
         "session_id": f"agent-{uuid4().hex[:16]}",
         "task_id": task_id,
@@ -250,7 +262,7 @@ def create_task(*, project: Path, description: str, risk: str, mode: str, apply:
         "gate_decision": "green",
         "gate_reason": "",
         "confirmation_status": "not_required",
-        "capability": {"profile": "core", "requested": [], "denied": []},
+        "capability": {"profile": profile, "requested": requested, "denied": []},
         "scope": [],
         "exclusions": ["git commit", "git push", "deployment"],
         "success_criteria": [],
@@ -298,6 +310,8 @@ def _session_transition(*, project: Path, home: Path, action: str, output_name: 
 def launch(*, provider: str, project: Path, home: Path, mode: str | None, provider_args: list[str], execute: bool) -> int:
     if provider not in {"codex", "claude"}:
         raise ValueError("provider must be codex or claude")
+    _validate_provider_args(provider, provider_args)
+    project = project.resolve()
     session_file = _latest_session(project)
     if not session_file:
         raise ValueError("No AgentKit session found. Run task new first.")
@@ -318,15 +332,17 @@ def launch(*, provider: str, project: Path, home: Path, mode: str | None, provid
         session["provider"] = provider
         session_file.write_text(json.dumps(session, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    command = [provider, *provider_args]
     if not execute:
         print(
             json.dumps(
                 {
-                    "provider_command": command,
+                    "provider": provider,
+                    "provider_args": provider_args,
                     "bridge_command": [*_runtime_command(project), "--data-dir", str(metaos_root(home) / "data"), "prepare", "--session-file", str(session_file)],
+                    "capability_profile": session.get("capability", {}).get("profile"),
+                    "requested_mcp_servers": [item.removeprefix("mcp:") for item in session.get("capability", {}).get("requested", []) if item.startswith("mcp:")],
                     "session_file": str(session_file),
-                    "note": "Preview only: no gate evaluation and no provider launch occurred.",
+                    "note": "Preview only: no gate evaluation, worktree creation, policy write, or provider launch occurred.",
                 },
                 ensure_ascii=False,
                 indent=2,
@@ -341,7 +357,7 @@ def launch(*, provider: str, project: Path, home: Path, mode: str | None, provid
             raise ValueError(f"Session must be prepared before launch; current status is {session.get('status')}.")
         prepared_file = session_file
         prepared_session = session
-        launch_context = _local_launch_context(prepared_session)
+        context = _load_prepared_context(prepared_file)
     else:
         prepared_file = session_file.parent / "prepared-session.json"
         prepared_result = _run_bridge(
@@ -355,9 +371,24 @@ def launch(*, provider: str, project: Path, home: Path, mode: str | None, provid
         payload = _parse_bridge_payload(prepared_result.stdout)
         prepared_session = payload["session"]
         if prepared_session["status"] == "blocked":
+            _save_prepared_context(prepared_file, payload)
             _emit_bridge_result(prepared_result)
             return 3
-        launch_context = payload.get("launch_context", {})
+        _save_prepared_context(prepared_file, payload)
+        context = payload
+
+    capability_policy = context.get("capability_policy")
+    launch_context = context.get("launch_context") or {}
+    if not isinstance(capability_policy, dict):
+        raise ValueError("Prepared session is missing its resolved capability policy. Create a new task.")
+    runtime_plan = render_plan(
+        provider=provider,
+        project=project,
+        task_dir=prepared_file.parent,
+        metaos_home=metaos_root(home),
+        session=prepared_session,
+        policy=capability_policy,
+    )
 
     running = prepared_file.parent / "running-session.json"
     running_result = _run_bridge(
@@ -371,14 +402,20 @@ def launch(*, provider: str, project: Path, home: Path, mode: str | None, provid
 
     env = os.environ.copy()
     env.update(launch_context.get("environment", {}))
-    env["METAOS_PROJECT_ROOT"] = str(project.resolve())
+    env.update(runtime_plan.environment)
+    env["METAOS_PROJECT_ROOT"] = str(project)
     env["METAOS_AGENT_SESSION_FILE"] = str(running)
     env["METAOS_AGENTKIT_HOME"] = str(global_home(home))
+    command = [*runtime_plan.command_prefix, *provider_args]
+    _write_launch_audit(prepared_file.parent, runtime_plan, command)
     try:
-        return subprocess.run(command, cwd=project, env=env, check=False).returncode
+        result = subprocess.run(command, cwd=runtime_plan.working_directory, env=env, check=False)
     except FileNotFoundError:
         print(f"Provider command not found: {provider}", file=sys.stderr)
+        _write_provider_exit(prepared_file.parent, returncode=127, detail="provider command not found")
         return 127
+    _write_provider_exit(prepared_file.parent, returncode=result.returncode, detail="provider exited; session still requires explicit finalize")
+    return result.returncode
 
 
 def finalize_task(
@@ -404,6 +441,16 @@ def finalize_task(
     return output
 
 
+def _default_profile(*, risk: str, mode: str) -> str:
+    if risk == "R2" and mode == "stage":
+        return "repo-stage"
+    if risk in {"R3", "R4"} and mode == "commit":
+        return "external-commit"
+    if risk == "R1":
+        return "repo-read"
+    return "core"
+
+
 def _latest_session(project: Path) -> Path | None:
     tasks = project_home(project.resolve()) / "tasks"
     if not tasks.exists():
@@ -417,17 +464,96 @@ def _load_session(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _local_launch_context(session: dict) -> dict:
-    return {
-        "environment": {
-            "METAOS_AGENT_SESSION_ID": session["session_id"],
-            "METAOS_TASK_ID": session["task_id"],
-            "METAOS_MODE": session["mode"],
-            "METAOS_RISK": session["risk"],
-            "METAOS_GATE_DECISION": session["gate_decision"],
-            "METAOS_CAPABILITY_PROFILE": session.get("capability", {}).get("profile", "core"),
-        }
-    }
+def _context_path(session_file: Path) -> Path:
+    return session_file.parent / "runtime" / "prepared-context.json"
+
+
+def _save_prepared_context(session_file: Path, payload: dict) -> Path:
+    target = _context_path(session_file)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return target
+
+
+def _load_prepared_context(session_file: Path) -> dict:
+    target = _context_path(session_file)
+    if not target.exists():
+        raise ValueError("Prepared session has no persisted MetaOS context. Create a new task.")
+    try:
+        return json.loads(target.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError("Prepared MetaOS context is invalid; create a new task.") from exc
+
+
+def _validate_provider_args(provider: str, provider_args: list[str]) -> None:
+    blocked = {
+        "codex": {
+            "--sandbox",
+            "-s",
+            "--ask-for-approval",
+            "-a",
+            "--add-dir",
+            "--config",
+            "-c",
+            "--profile",
+            "-p",
+            "--permissions-profile",
+            "-P",
+            "--dangerously-bypass-approvals-and-sandbox",
+            "--yolo",
+        },
+        "claude": {
+            "--settings",
+            "--permission-mode",
+            "--dangerously-skip-permissions",
+            "--bypass-permissions",
+        },
+    }[provider]
+    for arg in provider_args:
+        if arg in blocked or any(arg.startswith(f"{item}=") for item in blocked if item.startswith("--")):
+            raise ValueError(f"Provider argument {arg!r} can weaken or replace the MetaOS capability boundary.")
+
+
+def _write_launch_audit(task_dir: Path, runtime_plan: ProviderRuntimePlan, command: list[str]) -> None:
+    target = task_dir / "audit" / "launch-plan.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        json.dumps(
+            {
+                "created_at": datetime.now(UTC).isoformat(),
+                "provider": runtime_plan.provider,
+                "working_directory": str(runtime_plan.working_directory),
+                "worktree_path": str(runtime_plan.worktree_path) if runtime_plan.worktree_path else None,
+                "policy_file": str(runtime_plan.policy_file) if runtime_plan.policy_file else None,
+                "allowed_mcp_servers": list(runtime_plan.allowed_mcp_servers),
+                "disabled_mcp_servers": list(runtime_plan.disabled_mcp_servers),
+                "command": command,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_provider_exit(task_dir: Path, *, returncode: int, detail: str) -> None:
+    target = task_dir / "audit" / "provider-exit.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        json.dumps(
+            {
+                "created_at": datetime.now(UTC).isoformat(),
+                "returncode": returncode,
+                "detail": detail,
+                "finalization_required": True,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def _runtime_command(project: Path) -> list[str]:
@@ -455,11 +581,6 @@ def _run_bridge(*, project: Path, home: Path, arguments: list[str]) -> subproces
 
 
 def _parse_bridge_payload(stdout: str) -> dict:
-    for candidate in reversed([line for line in stdout.splitlines() if line.strip()]):
-        try:
-            return json.loads(candidate)
-        except json.JSONDecodeError:
-            continue
     try:
         return json.loads(stdout)
     except json.JSONDecodeError as exc:
