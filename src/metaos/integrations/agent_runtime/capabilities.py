@@ -82,6 +82,18 @@ PROFILES: dict[str, CapabilityProfile] = {
         require_human_confirmation_for_launch=False,
         description="Focused code or configuration changes in an isolated Git worktree; no MCP servers.",
     ),
+    "high-risk-stage": CapabilityProfile(
+        name="high-risk-stage",
+        allowed_risks=(OperationalRisk.R3, OperationalRisk.R4),
+        allowed_modes=(ExecutionMode.STAGE,),
+        codex_sandbox="workspace-write",
+        codex_approval="on-request",
+        network=False,
+        isolate_git_worktree=True,
+        allow_explicit_mcp=False,
+        require_human_confirmation_for_launch=False,
+        description="High-risk planning, rehearsal, or reviewable patch generation in an isolated worktree; no external effects or MCP servers.",
+    ),
     "external-commit": CapabilityProfile(
         name="external-commit",
         allowed_risks=(OperationalRisk.R3, OperationalRisk.R4),
@@ -100,6 +112,8 @@ PROFILES: dict[str, CapabilityProfile] = {
 def default_profile_name(session: AgentSession) -> str:
     if session.risk == OperationalRisk.R2 and session.mode == ExecutionMode.STAGE:
         return "repo-stage"
+    if session.risk in {OperationalRisk.R3, OperationalRisk.R4} and session.mode == ExecutionMode.STAGE:
+        return "high-risk-stage"
     if session.risk in {OperationalRisk.R3, OperationalRisk.R4} and session.mode == ExecutionMode.COMMIT:
         return "external-commit"
     if session.risk == OperationalRisk.R1:
