@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from metaos.core.engine import SEngine
@@ -11,6 +12,7 @@ from metaos.integrations.agent_runtime.contracts import (
     OperationalRisk,
     ProviderKind,
     SessionStatus,
+    TargetBinding,
     VerificationPlan,
 )
 from metaos.integrations.agent_runtime.service import AgentRuntimeService
@@ -29,6 +31,16 @@ def _engine(tmp_path: Path, level: DecisionLevel) -> SEngine:
     engine = SEngine(data_dir=str(tmp_path / "data"))
     engine.gate = _Gate(level)
     return engine
+
+
+def _binding(*, kind: str, target: str, operation: str, scope: list[str]) -> TargetBinding:
+    return TargetBinding(
+        kind=kind,
+        target=target,
+        operation=operation,
+        scope=scope,
+        expires_at=(datetime.now(UTC) + timedelta(minutes=30)).isoformat(),
+    )
 
 
 def test_r2_stage_green_session_is_prepared_then_finalized(tmp_path: Path) -> None:
@@ -68,6 +80,12 @@ def test_yellow_commit_session_requires_human_approval_before_launch(tmp_path: P
         description="Send a customer email",
         risk=OperationalRisk.R3,
         mode=ExecutionMode.COMMIT,
+        target_binding=_binding(
+            kind="email",
+            target="mailto:alice@example.com",
+            operation="send",
+            scope=["subject:status update"],
+        ),
         success_criteria=["Message accepted by SMTP provider"],
         verification=VerificationPlan(expected_outcomes=["provider receipt"]),
     )
@@ -94,6 +112,12 @@ def test_red_gate_blocks_r4_and_emits_trace(tmp_path: Path) -> None:
         description="Deploy destructive migration",
         risk=OperationalRisk.R4,
         mode=ExecutionMode.COMMIT,
+        target_binding=_binding(
+            kind="database_migration",
+            target="production:primary",
+            operation="apply",
+            scope=["migration:20260628_add_index"],
+        ),
         success_criteria=["Migration health check passes"],
         verification=VerificationPlan(expected_outcomes=["health endpoint is green"]),
         rollback_or_containment=["restore database snapshot"],
