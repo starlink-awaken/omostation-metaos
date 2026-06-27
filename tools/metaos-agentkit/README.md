@@ -8,7 +8,8 @@ It does **not** patch vendor binaries, replace CC Switch routing, or become a se
 - inject marker-bounded provider rules into native instruction files;
 - link lightweight MetaOS Skills into native skill locations;
 - create provider-local projections of canonical `AgentSession` objects;
-- call the root MetaOS runtime for gate, approval, lifecycle state, assets, decisions, and trace;
+- call the root MetaOS runtime for Gate, approval, lifecycle state, assets, decisions, and trace;
+- render the resolved capability profile into a one-session Codex or Claude Code runtime boundary;
 - launch an existing `codex` or `claude` command only after MetaOS permits it.
 
 ## Architecture
@@ -17,11 +18,15 @@ It does **not** patch vendor binaries, replace CC Switch routing, or become a se
 AgentKit (provider adapter)
   → metaos-agent prepare
       → SEngine / DecisionGate / DLayer / Trace
+  → session capability renderer
+      → sandbox / approval / worktree / MCP allowlist / Hook
   → provider launch
   → metaos-agent finalize
 ```
 
-Operational risk (`R0`–`R4`), execution mode (`observe` / `propose` / `stage` / `commit`), dynamic Gate decision (`green` / `yellow` / `red`), and human confirmation are separate dimensions.
+Operational risk (`R0`–`R4`), execution mode (`observe` / `propose` / `stage` / `commit`), dynamic Gate decision (`green` / `yellow` / `red`), human confirmation, and capability profile are separate dimensions.
+
+Read [Capability Profiles](../../docs/CAPABILITY-PROFILES.md) for the enforcement model.
 
 ## Quick start
 
@@ -35,16 +40,26 @@ cd /path/to/project
 uv run --directory /path/to/omostation-metaos/tools/metaos-agentkit \
   metaos-agentkit init --local --provider codex,claude --apply
 
+# R2 stage: defaults to repo-stage, creates a detached worktree on --execute.
 uv run --directory /path/to/omostation-metaos/tools/metaos-agentkit \
   metaos-agentkit task new "Fix login TypeScript error" --risk R2 --mode stage
 
-# Preview only: does not evaluate Gate or start a provider.
+# Preview only: does not evaluate Gate, create a worktree, render provider policy, or start a provider.
 uv run --directory /path/to/omostation-metaos/tools/metaos-agentkit \
   metaos-agentkit launch codex --mode stage -- --help
 
 # Real launch: Gate is evaluated first. A blocked session is never launched.
 uv run --directory /path/to/omostation-metaos/tools/metaos-agentkit \
   metaos-agentkit launch codex --mode stage --execute
+```
+
+Read-only research with one explicitly named MCP server:
+
+```bash
+metaos-agentkit task new "Verify current provider settings" \
+  --risk R1 --mode observe \
+  --profile research-read \
+  --allow-mcp web-reader
 ```
 
 For a yellow commit session:
@@ -65,18 +80,20 @@ metaos-agentkit task finalize \
 | MetaOS Core | `~/.metaos/data/` | `SEngine` / `DLayer` |
 | AgentKit global | `~/.metaos/agentkit/` | AgentKit provider integration |
 | AgentKit project | `.metaos/agentkit/` | provider-local projections, staging and audit working files |
+| Session runtime | `.metaos/agentkit/tasks/<task>/runtime/` | generated Provider policy and persisted prepared context |
 | Provider configuration | `AGENTS.md`, `CLAUDE.md`, `CLAUDE.local.md`, native skill links | marker-bounded AgentKit blocks only |
 
 Provider-local files are projections/caches. Canonical authorization, decisions, assets, lifecycle state, and traces are written by root MetaOS.
 
-## Safety model
+## Capability enforcement
 
-- `init` defaults to preview mode; `--apply` is required for file mutations.
-- The project initializer adds `.metaos/` only to `.git/info/exclude`, never to a shared `.gitignore`.
-- `launch` defaults to preview; `--execute` performs MetaOS `prepare` before provider execution.
-- A `yellow + commit` session is blocked until `task approve` records human confirmation through the existing MetaOS path.
-- A provider process exit does not finalize a task. `task finalize` records actual verification evidence.
-- Prompt rules are guidance. Codex sandbox/approvals, Claude permissions/hooks, MCP allowlists, Docker mounts, OAuth, and secret storage remain the real enforcement layer.
+- `core` / `repo-read`: read-only, no MCP server is allowed.
+- `research-read`: only explicitly named MCP servers may be projected.
+- `repo-stage`: Codex uses workspace write with network off; Claude uses a session overlay and PreToolUse Hook; both run in a detached worktree.
+- `external-commit`: requires MetaOS commit validation and Gate/confirmation; only explicit MCP names are eligible.
+- AgentKit rejects provider flags that could replace the session boundary, including Codex sandbox/config/approval flags and Claude settings/permission override flags.
+- Discovered MCP servers not in the session allowlist are disabled for that launch.
+- Provider exit is not success. Only `task finalize` with validation evidence records a final result.
 
 ## Commands
 
@@ -84,7 +101,8 @@ Provider-local files are projections/caches. Canonical authorization, decisions,
 metaos-agentkit init --global --provider codex,claude [--apply]
 metaos-agentkit init --local --path /repo --provider codex,claude [--apply]
 metaos-agentkit status [--path /repo]
-metaos-agentkit task new "Description" --risk R2 --mode stage [--path /repo]
+metaos-agentkit task new "Description" --risk R2 --mode stage \
+  [--profile repo-stage] [--allow-mcp server] [--path /repo]
 metaos-agentkit task approve [--comment "..."] [--path /repo]
 metaos-agentkit task reject [--comment "..."] [--path /repo]
 metaos-agentkit task finalize --summary "..." [--evidence "..."] [--verification-passed] [--path /repo]
@@ -98,11 +116,12 @@ metaos-agent mark-running --session-file approved.json --out running.json
 metaos-agent finalize --session-file running.json --out final.json --summary "..." --verification-passed
 ```
 
-## Limitations
+## Limits
 
-- Codex and Claude Code may evolve their instruction/skill discovery conventions. Verify generated files after provider upgrades.
-- AgentKit does not automatically configure MCP permissions, Docker mounts, sandbox settings, Claude hooks, OAuth, or secret storage.
-- Do not set broad filesystem or network permissions just because MetaOS rules are present.
+- The capability renderer is session-scoped. It does not rewrite your persistent CC Switch routing or default provider configuration.
+- Docker socket/mount execution is intentionally not enabled by any built-in profile yet.
+- Provider managed policy, operating-system ACLs, OAuth scopes, secret storage, and sandbox availability remain separate enforcement layers.
+- Codex and Claude Code can evolve their instruction, sandbox, and MCP conventions. Run the provider smoke tests after upgrades.
 
 ## Development
 
