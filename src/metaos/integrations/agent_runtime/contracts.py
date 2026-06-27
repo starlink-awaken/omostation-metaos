@@ -11,6 +11,8 @@ are deliberately separate concepts:
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -71,6 +73,40 @@ class CapabilityRequest:
 
 
 @dataclass
+class TargetBinding:
+    """A concrete high-impact operation approved for one short-lived session."""
+
+    kind: str = ""
+    target: str = ""
+    operation: str = ""
+    scope: list[str] = field(default_factory=list)
+    expires_at: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def fingerprint(self) -> str:
+        payload = {
+            "kind": self.kind,
+            "target": self.target,
+            "operation": self.operation,
+            "scope": sorted(self.scope),
+            "expires_at": self.expires_at,
+            "metadata": self.metadata,
+        }
+        return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+    def is_expired(self, now: datetime | None = None) -> bool:
+        if not self.expires_at:
+            return True
+        try:
+            expiry = datetime.fromisoformat(self.expires_at.replace("Z", "+00:00"))
+        except ValueError:
+            return True
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=UTC)
+        return expiry <= (now or datetime.now(UTC))
+
+
+@dataclass
 class AgentSession:
     """The provider-neutral session contract persisted as a MetaOS asset.
 
@@ -89,6 +125,8 @@ class AgentSession:
     gate_reason: str = ""
     confirmation_status: ConfirmationStatus = ConfirmationStatus.NOT_REQUIRED
     capability: CapabilityRequest = field(default_factory=CapabilityRequest)
+    target_binding: TargetBinding | None = None
+    approved_target_fingerprint: str = ""
     scope: list[str] = field(default_factory=list)
     exclusions: list[str] = field(default_factory=list)
     success_criteria: list[str] = field(default_factory=list)
@@ -100,6 +138,7 @@ class AgentSession:
     finalized_at: datetime | None = None
     result_summary: str = ""
     evidence: list[str] = field(default_factory=list)
+    evidence_bundle: dict[str, Any] = field(default_factory=dict)
     decision_id: str = ""
     asset_id: str = ""
 
@@ -118,6 +157,7 @@ class AgentSession:
     def from_dict(cls, data: dict[str, Any]) -> "AgentSession":
         verification = data.get("verification") or {}
         capability = data.get("capability") or {}
+        target_binding = data.get("target_binding")
         created_at = data.get("created_at")
         finalized_at = data.get("finalized_at")
         return cls(
@@ -134,6 +174,8 @@ class AgentSession:
                 data.get("confirmation_status", ConfirmationStatus.NOT_REQUIRED.value)
             ),
             capability=CapabilityRequest(**capability),
+            target_binding=TargetBinding(**target_binding) if target_binding else None,
+            approved_target_fingerprint=data.get("approved_target_fingerprint", ""),
             scope=list(data.get("scope") or []),
             exclusions=list(data.get("exclusions") or []),
             success_criteria=list(data.get("success_criteria") or []),
@@ -145,9 +187,14 @@ class AgentSession:
             finalized_at=datetime.fromisoformat(finalized_at) if finalized_at else None,
             result_summary=data.get("result_summary", ""),
             evidence=list(data.get("evidence") or []),
+            evidence_bundle=dict(data.get("evidence_bundle") or {}),
             decision_id=data.get("decision_id", ""),
             asset_id=data.get("asset_id", ""),
         )
+
+
+def high_risk_commit(session: AgentSession) -> bool:
+    return session.risk in {OperationalRisk.R3, OperationalRisk.R4} and session.mode == ExecutionMode.COMMIT
 
 
 def validate_session_policy(session: AgentSession) -> list[str]:
@@ -155,7 +202,8 @@ def validate_session_policy(session: AgentSession) -> list[str]:
 
     High-risk work may still be observed, proposed, or staged. Only a commit
     request requires explicit success and verification criteria. R4 commit
-    work additionally requires a rollback or containment path.
+    work additionally requires a rollback or containment path. R3/R4 commit
+    work also requires an expiring binding to the exact target and operation.
     """
     violations: list[str] = []
     if session.mode == ExecutionMode.COMMIT and not session.success_criteria:
@@ -164,4 +212,10 @@ def validate_session_policy(session: AgentSession) -> list[str]:
         violations.append("commit mode requires a verification plan.")
     if session.risk == OperationalRisk.R4 and session.mode == ExecutionMode.COMMIT and not session.rollback_or_containment:
         violations.append("R4 commit sessions require rollback or containment instructions.")
+    if high_risk_commit(session):
+        binding = session.target_binding
+        if not binding or not binding.kind or not binding.target or not binding.operation or not binding.scope:
+            violations.append("R3/R4 commit sessions require a target binding with kind, target, operation, and scope.")
+        elif binding.is_expired():
+            violations.append("R3/R4 commit target binding is missing, invalid, or expired.")
     return violations
