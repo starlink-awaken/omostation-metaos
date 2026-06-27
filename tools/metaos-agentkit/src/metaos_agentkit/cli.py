@@ -22,6 +22,9 @@ from .service import (
 )
 
 
+PROFILE_NAMES = ["core", "repo-read", "research-read", "repo-stage", "external-commit"]
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="metaos-agentkit", description="MetaOS AgentKit bootstrapper for Codex and Claude Code")
     parser.add_argument("--home", type=Path, default=Path.home(), help=argparse.SUPPRESS)
@@ -44,6 +47,14 @@ def _parser() -> argparse.ArgumentParser:
     p_new.add_argument("description")
     p_new.add_argument("--risk", default="R0")
     p_new.add_argument("--mode", default="observe")
+    p_new.add_argument("--profile", choices=PROFILE_NAMES, help="capability profile; inferred when omitted")
+    p_new.add_argument(
+        "--allow-mcp",
+        action="append",
+        default=[],
+        metavar="SERVER",
+        help="explicit MCP server request; only allowed by research-read or external-commit profiles",
+    )
     p_new.add_argument("--path", type=Path, default=Path.cwd())
 
     p_approve = task_sub.add_parser("approve", help="Approve the latest pending yellow-gate session")
@@ -103,7 +114,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "task":
             project = args.path.expanduser()
             if args.task_command == "new":
-                print(create_task(project=project, description=args.description, risk=args.risk, mode=args.mode))
+                print(
+                    create_task(
+                        project=project,
+                        description=args.description,
+                        risk=args.risk,
+                        mode=args.mode,
+                        capability_profile=args.profile,
+                        allowed_mcp_servers=args.allow_mcp,
+                    )
+                )
                 return 0
             if args.task_command == "approve":
                 print(approve_task(project=project, home=home, comment=args.comment))
