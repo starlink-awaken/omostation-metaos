@@ -38,9 +38,20 @@ jobs:
       - name: Run MetaOS agent runtime contract tests
         env:
           PYTHONPATH: src
-        run: >-
-          python -m pytest -q --tb=short
-          tests/test_agent_runtime_contracts.py
-          tests/test_agent_runtime_capabilities.py
-          tests/test_agent_runtime_provider_context.py
-          tests/test_agent_runtime_canonical.py
+        run: |
+          set -o pipefail
+          python -m pytest -q --tb=short \
+            tests/test_agent_runtime_contracts.py \
+            tests/test_agent_runtime_capabilities.py \
+            tests/test_agent_runtime_provider_context.py \
+            tests/test_agent_runtime_canonical.py \
+            tests/test_agent_runtime_target_binding.py \
+            tests/test_agent_runtime_evidence.py \
+            2>&1 | tee agent-runtime-test-output.txt
+      - name: Upload failed test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-runtime-test-output
+          path: agent-runtime-test-output.txt
+          if-no-files-found: ignore
