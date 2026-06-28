@@ -271,7 +271,6 @@ def main(argv: list[str] | None = None) -> int:
             print("❌ 准入拦截 (Rejected):")
             for reason in result['reasons']:
                 print(f"   - {reason}")
-            import sys
             sys.exit(1)
     elif args.command == "review":
         cli.review(args.action, args.expected, args.actual)
