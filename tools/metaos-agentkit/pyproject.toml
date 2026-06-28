@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "metaos-agentkit"
-version = "0.1.0"
-description = "Personal MetaOS bootstrapper for Codex and Claude Code"
+version = "0.2.0"
+description = "Personal MetaOS provider adapter for Codex and Claude Code"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

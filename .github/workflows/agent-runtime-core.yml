@@ -1,0 +1,57 @@
+name: Agent Runtime Core
+
+on:
+  pull_request:
+    paths:
+      - "src/metaos/integrations/agent_runtime/**"
+      - "src/metaos/agent_cli.py"
+      - "src/metaos/core/**"
+      - "src/metaos/layers/**"
+      - "tests/test_agent_runtime_*.py"
+      - ".github/workflows/agent-runtime-core.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "src/metaos/integrations/agent_runtime/**"
+      - "src/metaos/agent_cli.py"
+      - "src/metaos/core/**"
+      - "src/metaos/layers/**"
+      - "tests/test_agent_runtime_*.py"
+      - ".github/workflows/agent-runtime-core.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install narrow test dependencies
+        run: python -m pip install --disable-pip-version-check pytest requests
+      - name: Compile runtime modules
+        run: python -m compileall -q src/metaos/integrations/agent_runtime src/metaos/agent_cli.py
+      - name: Run MetaOS agent runtime contract tests
+        env:
+          PYTHONPATH: src
+        run: |
+          set -o pipefail
+          python -m pytest -q --tb=short \
+            tests/test_agent_runtime_contracts.py \
+            tests/test_agent_runtime_capabilities.py \
+            tests/test_agent_runtime_provider_context.py \
+            tests/test_agent_runtime_canonical.py \
+            tests/test_agent_runtime_target_binding.py \
+            tests/test_agent_runtime_evidence.py \
+            2>&1 | tee agent-runtime-test-output.txt
+      - name: Upload failed test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-runtime-test-output
+          path: agent-runtime-test-output.txt
+          if-no-files-found: ignore
