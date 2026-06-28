@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "metaos-agentkit"
+version = "0.2.0"
+description = "Personal MetaOS provider adapter for Codex and Claude Code"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "starlink-awaken" }]
+keywords = ["agent", "codex", "claude-code", "mcp", "governance"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+]
+
+[project.scripts]
+metaos-agentkit = "metaos_agentkit.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/metaos_agentkit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

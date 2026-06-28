@@ -1,0 +1,234 @@
+"""CLI for initializing MetaOS AgentKit without modifying provider binaries."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from .service import Plan, install_global, install_local, normalize_providers, status, uninstall_global
+from .task_actions import (
+    approve_task,
+    archive_task,
+    cleanup_tasks,
+    finalize_task,
+    launch_task,
+    list_tasks,
+    reject_task,
+)
+from .task_creation import create_task
+
+
+PROFILE_NAMES = [
+    "core",
+    "repo-read",
+    "research-read",
+    "repo-stage",
+    "high-risk-stage",
+    "external-commit",
+]
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="metaos-agentkit", description="MetaOS AgentKit bootstrapper for Codex and Claude Code")
+    parser.add_argument("--home", type=Path, default=Path.home(), help=argparse.SUPPRESS)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_init = sub.add_parser("init", help="Preview or apply global/project initialization")
+    scope = p_init.add_mutually_exclusive_group(required=True)
+    scope.add_argument("--global", dest="global_scope", action="store_true")
+    scope.add_argument("--local", dest="local_scope", action="store_true")
+    p_init.add_argument("--provider", default="codex,claude", help="comma-separated: codex,claude")
+    p_init.add_argument("--path", type=Path, default=Path.cwd(), help="project root for --local")
+    p_init.add_argument("--apply", action="store_true", help="perform writes; default is preview")
+
+    p_status = sub.add_parser("status", help="Show MetaOS installation status")
+    p_status.add_argument("--path", type=Path, default=Path.cwd())
+
+    p_task = sub.add_parser("task", help="Manage canonical MetaOS AgentSession projections")
+    task_sub = p_task.add_subparsers(dest="task_command", required=True)
+    p_new = task_sub.add_parser("new", help="Create a provider-local AgentSession projection")
+    p_new.add_argument("description")
+    p_new.add_argument("--risk", default="R0")
+    p_new.add_argument("--mode", default="observe")
+    p_new.add_argument("--profile", choices=PROFILE_NAMES, help="capability profile; inferred when omitted")
+    p_new.add_argument(
+        "--allow-mcp",
+        action="append",
+        default=[],
+        metavar="SERVER",
+        help="explicit MCP server request; only allowed by research-read or external-commit profiles",
+    )
+    p_new.add_argument("--target-kind", default="", help="high-risk target type, e.g. calendar_event or github_pull_request")
+    p_new.add_argument("--target", default="", help="exact high-risk external target")
+    p_new.add_argument("--operation", default="", help="exact requested operation on the target")
+    p_new.add_argument("--scope", action="append", default=[], help="approved target scope; repeatable")
+    p_new.add_argument("--expires-in-minutes", type=int, help="high-risk target binding lifetime")
+    p_new.add_argument("--success-criterion", action="append", default=[], help="explicit success criterion; repeatable")
+    p_new.add_argument("--verify-command", action="append", default=[], help="planned verification command; repeatable")
+    p_new.add_argument("--verify-expect", action="append", default=[], help="expected verification outcome; repeatable")
+    p_new.add_argument("--rollback", action="append", default=[], help="rollback or containment instruction; repeatable")
+    p_new.add_argument("--path", type=Path, default=Path.cwd())
+
+    p_list = task_sub.add_parser("list", help="List active tasks and, optionally, archived tasks")
+    p_list.add_argument("--all", action="store_true", help="include archived tasks")
+    p_list.add_argument("--path", type=Path, default=Path.cwd())
+
+    p_approve = task_sub.add_parser("approve", help="Approve a pending yellow-gate session")
+    p_approve.add_argument("--task", help="task identifier; mandatory for R3/R4 commit tasks")
+    p_approve.add_argument("--comment", default="")
+    p_approve.add_argument("--path", type=Path, default=Path.cwd())
+
+    p_reject = task_sub.add_parser("reject", help="Reject a pending yellow-gate session")
+    p_reject.add_argument("--task", help="task identifier; mandatory for R3/R4 commit tasks")
+    p_reject.add_argument("--comment", default="")
+    p_reject.add_argument("--path", type=Path, default=Path.cwd())
+
+    p_finalize = task_sub.add_parser("finalize", help="Record a verified or failed provider outcome")
+    p_finalize.add_argument("--task", help="task identifier; mandatory for R3/R4 commit tasks")
+    p_finalize.add_argument("--summary", required=True)
+    p_finalize.add_argument("--evidence", action="append", default=[])
+    p_finalize.add_argument("--verification-passed", action="store_true")
+    p_finalize.add_argument("--path", type=Path, default=Path.cwd())
+
+    p_archive = task_sub.add_parser("archive", help="Archive one terminal task and remove its managed worktree")
+    p_archive.add_argument("--task", required=True, help="terminal task identifier")
+    p_archive.add_argument("--path", type=Path, default=Path.cwd())
+    p_archive.add_argument("--apply", action="store_true", help="perform archive; default is preview")
+
+    p_cleanup = task_sub.add_parser("cleanup", help="Archive terminal tasks older than a retention window")
+    p_cleanup.add_argument("--older-than", type=int, default=14, metavar="DAYS")
+    p_cleanup.add_argument("--path", type=Path, default=Path.cwd())
+    p_cleanup.add_argument("--apply", action="store_true", help="perform cleanup; default is preview")
+
+    p_launch = sub.add_parser("launch", help="Prepare through MetaOS, then launch a provider")
+    p_launch.add_argument("provider", choices=["codex", "claude"])
+    p_launch.add_argument("--task", help="task identifier; mandatory for R3/R4 commit tasks")
+    p_launch.add_argument("--mode", choices=["observe", "propose", "stage", "commit"])
+    p_launch.add_argument("--path", type=Path, default=Path.cwd())
+    p_launch.add_argument("--execute", action="store_true", help="gate and run provider; default is preview")
+
+    p_uninstall = sub.add_parser("uninstall", help="Remove only MetaOS-managed global blocks and symlinks")
+    p_uninstall.add_argument("--global", dest="global_scope", action="store_true", required=True)
+    p_uninstall.add_argument("--provider", default="codex,claude")
+    p_uninstall.add_argument("--apply", action="store_true")
+    return parser
+
+
+def _show_plans(plans: list[Plan], apply: bool) -> None:
+    mode = "APPLY" if apply else "PREVIEW"
+    print(f"{mode}: {len(plans)} planned operation(s)")
+    for plan in plans:
+        print(f"- {plan.action:9} {plan.target}  [{plan.detail}]")
+    if not apply:
+        print("Re-run with --apply to write changes.")
+
+
+def _inferred_profile(risk: str, mode: str, explicit_profile: str | None) -> str | None:
+    if explicit_profile:
+        return explicit_profile
+    if risk in {"R3", "R4"} and mode == "stage":
+        return "high-risk-stage"
+    return None
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = _parser()
+    args, unknown = parser.parse_known_args(argv)
+    if unknown and args.command != "launch":
+        parser.error(f"unrecognized arguments: {' '.join(unknown)}")
+    home = args.home.expanduser().resolve()
+    try:
+        if args.command == "init":
+            providers = normalize_providers(args.provider)
+            if args.global_scope:
+                _show_plans(install_global(home=home, providers=providers, apply=args.apply), args.apply)
+            else:
+                project = args.path.expanduser().resolve()
+                _show_plans(install_local(project=project, home=home, providers=providers, apply=args.apply), args.apply)
+            return 0
+        if args.command == "status":
+            print(json.dumps(status(project=args.path.expanduser(), home=home), ensure_ascii=False, indent=2))
+            return 0
+        if args.command == "task":
+            project = args.path.expanduser()
+            if args.task_command == "new":
+                print(
+                    create_task(
+                        project=project,
+                        description=args.description,
+                        risk=args.risk,
+                        mode=args.mode,
+                        capability_profile=_inferred_profile(args.risk, args.mode, args.profile),
+                        allowed_mcp_servers=args.allow_mcp,
+                        target_kind=args.target_kind,
+                        target=args.target,
+                        operation=args.operation,
+                        scope=args.scope,
+                        expires_in_minutes=args.expires_in_minutes,
+                        success_criteria=args.success_criterion,
+                        verification_commands=args.verify_command,
+                        verification_expected_outcomes=args.verify_expect,
+                        rollback_or_containment=args.rollback,
+                    )
+                )
+                return 0
+            if args.task_command == "list":
+                print(json.dumps(list_tasks(project=project, include_archived=args.all), ensure_ascii=False, indent=2))
+                return 0
+            if args.task_command == "approve":
+                print(approve_task(project=project, home=home, task_id=args.task, comment=args.comment))
+                return 0
+            if args.task_command == "reject":
+                print(reject_task(project=project, home=home, task_id=args.task, comment=args.comment))
+                return 0
+            if args.task_command == "finalize":
+                print(
+                    finalize_task(
+                        project=project,
+                        home=home,
+                        task_id=args.task,
+                        summary=args.summary,
+                        evidence=args.evidence,
+                        verification_passed=args.verification_passed,
+                    )
+                )
+                return 0 if args.verification_passed else 4
+            if args.task_command == "archive":
+                print(json.dumps(archive_task(project=project, home=home, task_id=args.task, apply=args.apply), ensure_ascii=False, indent=2))
+                return 0
+            if args.task_command == "cleanup":
+                print(
+                    json.dumps(
+                        cleanup_tasks(project=project, home=home, older_than_days=args.older_than, apply=args.apply),
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                )
+                return 0
+        if args.command == "launch":
+            pass_through = unknown
+            if pass_through[:1] == ["--"]:
+                pass_through = pass_through[1:]
+            return launch_task(
+                provider=args.provider,
+                project=args.path.expanduser(),
+                home=home,
+                task_id=args.task,
+                mode=args.mode,
+                provider_args=pass_through,
+                execute=args.execute,
+            )
+        if args.command == "uninstall":
+            providers = normalize_providers(args.provider)
+            _show_plans(uninstall_global(home=home, providers=providers, apply=args.apply), args.apply)
+            return 0
+    except (ValueError, OSError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
