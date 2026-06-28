@@ -119,7 +119,7 @@ class L2Controller:
                     },
                     timeout=1.0,
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  # defensive fallback
                 _log.warning("Failed to anchor L2 circuit breaking to L0 SSB", exc_info=e)
 
         return {

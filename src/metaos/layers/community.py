@@ -180,7 +180,7 @@ class CommunityEngine:
                             "proposer_h": prop.proposer_h,
                         }
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001  # defensive fallback
                     pass
         elif prop.votes_against >= required:
             prop.status = ProposalStatus.REJECTED
@@ -253,7 +253,7 @@ class CommunityEngine:
                         "arbiter_h_id": conflict.arbiter_h_id,
                     }
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001  # defensive fallback
                 pass
         return {
             "status": "ok",

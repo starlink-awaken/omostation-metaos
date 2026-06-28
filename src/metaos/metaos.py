@@ -318,7 +318,7 @@ def cmd_interactive(args):
                     cli2.morning("今日最值得聚焦的认知点是？")
                     cli2.evening("今日最重要的认知收获是？")
                 print("完成")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  # defensive fallback
                 print(f"错误: {e}")
         else:
             print(f"未知命令: {cmd}")

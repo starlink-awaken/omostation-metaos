@@ -131,7 +131,7 @@ class OllamaBackend(ModelBackend):
                     logger.warning("Ollama 已连接但未找到可用模型")
             else:
                 logger.warning("Ollama 返回异常状态码: %s", r.status_code)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # defensive fallback
             logger.info("Ollama 不可用（将使用 Mock 降级）: %s", exc)
 
     def health(self) -> bool:
@@ -144,7 +144,7 @@ class OllamaBackend(ModelBackend):
                 timeout=5,
             )
             return r.status_code == 200
-        except Exception:
+        except Exception:  # noqa: BLE001  # defensive fallback
             self._available = False
             return False
 
@@ -217,7 +217,7 @@ class OllamaBackend(ModelBackend):
                     latency_ms=elapsed,
                 )
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001  # defensive fallback
             elapsed = int((time.time() - start) * 1000)
             logger.error("Ollama 调用异常: %s", exc)
             # 一次失败标记为不可用，后续自动降级

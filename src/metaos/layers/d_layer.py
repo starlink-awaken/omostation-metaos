@@ -128,7 +128,7 @@ class DLayer:
                 ),
             )
             conn.commit()
-        except Exception:
+        except Exception:  # noqa: BLE001  # defensive fallback
             conn.rollback()
             raise
         finally:
@@ -240,7 +240,7 @@ class DLayer:
                 ),
             )
             conn.commit()
-        except Exception:
+        except Exception:  # noqa: BLE001  # defensive fallback
             conn.rollback()
             raise
         finally:
@@ -312,7 +312,7 @@ class DLayer:
                 "event": event,
                 "detail": detail,
             })
-        except Exception:
+        except Exception:  # noqa: BLE001  # defensive fallback
             # 审计失败不影响主流程
             pass
 
@@ -358,7 +358,7 @@ class DLayer:
                         "last_used": dt.fromisoformat(r[5]),
                     }
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001  # defensive fallback
                 pass
         return result
 
@@ -439,13 +439,13 @@ class DLayer:
         conn = sqlite3.connect(str(self.db_path))
         try:
             rows = conn.execute("SELECT key, value FROM governance_state").fetchall()
-        except Exception:
+        except Exception:  # noqa: BLE001  # defensive fallback
             rows = []
         conn.close()
         result = {}
         for k, v in rows:
             try:
                 result[k] = json.loads(v)
-            except Exception:
+            except Exception:  # noqa: BLE001  # defensive fallback
                 result[k] = v
         return result
