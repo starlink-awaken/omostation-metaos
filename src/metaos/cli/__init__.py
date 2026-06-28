@@ -95,7 +95,7 @@ class CLI:
             try:
                 self.engine.d.save_principle(p)
                 print(f"\n📌 经验教训已自动存入 D_私有（原则 ID: {p.principle_id[:8]}）")
-            except Exception:  # noqa: BLE001  # defensive fallback
+            except Exception:  # defensive fallback  # noqa: BLE001
                 pass  # 存失败不阻塞主流程
 
         return result
@@ -292,7 +292,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {icon} [{nid}] {node.status}")
                 if node.output:
                     print(f"       → {node.output[:120]}...")
-        except Exception as e:  # noqa: BLE001  # defensive fallback
+        except Exception as e:  # defensive fallback  # noqa: BLE001
             print(f"❌ 工作流执行失败: {e}")
     elif args.command == "plan":
         from metaos.core.workflow_planner import WorkflowPlanner
@@ -331,7 +331,7 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"       → {node.output[:150]}...")
                 elif node.status == "awaiting_approval":
                     print(f"       ⚠️  需人工审批: metaos approve {wf.workflow_id}")
-        except Exception as e:  # noqa: BLE001  # defensive fallback
+        except Exception as e:  # defensive fallback  # noqa: BLE001
             print(f"❌ 动态规划失败: {e}")
             import traceback
             traceback.print_exc()

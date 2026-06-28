@@ -37,7 +37,7 @@ try:
             models = None
     else:
         models = None
-except Exception:  # noqa: BLE001  # defensive fallback
+except Exception:  # defensive fallback  # noqa: BLE001
     models = None
 
 results = {}

@@ -201,7 +201,7 @@ class Workflow:
             self._publish_event(node)
             return False
 
-        except Exception as e:  # noqa: BLE001  # defensive fallback
+        except Exception as e:  # defensive fallback  # noqa: BLE001
             node.output = f"Research subprocess failed: {e}"
             node.status = "failed"
             self._publish_event(node)
@@ -223,7 +223,7 @@ class Workflow:
             node.output = f"[超时] SEngine 超过 {node.timeout_seconds}s"
             self._publish_event(node)
             return False
-        except Exception as e:  # noqa: BLE001  # defensive fallback
+        except Exception as e:  # defensive fallback  # noqa: BLE001
             node.status = "failed"
             node.output = str(e)
             self._publish_event(node)
@@ -271,7 +271,7 @@ class Workflow:
                 headers={"Authorization": "Bearer omo_core_token"},
                 timeout=2
             )
-        except Exception as e:  # noqa: BLE001  # defensive fallback
+        except Exception as e:  # defensive fallback  # noqa: BLE001
             logger.warning(f"SSE publish failed for {node.node_id}: {e}")
 
     def _publish_human_approval_event(self, node: WorkflowNode):
@@ -293,5 +293,5 @@ class Workflow:
                 headers={"Authorization": "Bearer omo_core_token"},
                 timeout=2
             )
-        except Exception as e:  # noqa: BLE001  # defensive fallback
+        except Exception as e:  # defensive fallback  # noqa: BLE001
             logger.warning(f"Failed to publish approval event: {e}")

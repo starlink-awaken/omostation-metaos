@@ -279,7 +279,7 @@ def handle_status(sess, params):
         total = len(entries)
         has = sum(1 for e in entries if e["ssot"])
         ssot = f"{round(has / total * 100, 1)}% ({has}/{total})"
-    except Exception:  # noqa: BLE001  # defensive fallback
+    except Exception:  # defensive fallback  # noqa: BLE001
         ssot = "?"
     return {
         "backend": engine.m.backend_name,
@@ -354,7 +354,7 @@ def handle_ssot(sess, params):
             "coverage_pct": round(has / total * 100, 1) if total else 0,
             "missing": missing[:20] if params.get("verbose") else [],
         }
-    except Exception as e:  # noqa: BLE001  # defensive fallback
+    except Exception as e:  # defensive fallback  # noqa: BLE001
         return {"error": str(e)}
 
 
@@ -415,7 +415,7 @@ def handle_request(msg: dict) -> dict | None:
             return jsonrpc_result(
                 {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False, indent=2)}]}, msg_id
             )
-        except Exception as e:  # noqa: BLE001  # defensive fallback
+        except Exception as e:  # defensive fallback  # noqa: BLE001
             return jsonrpc_error(-32603, f"执行失败: {e}", msg_id)
 
     elif method == "resources/list":

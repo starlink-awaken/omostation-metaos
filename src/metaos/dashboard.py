@@ -25,7 +25,7 @@ def generate(data_dir: str = "") -> str:
         total = len(entries)
         has = sum(1 for e in entries if e["ssot"])
         ssot_pct = round(has / total * 100, 1) if total > 0 else 0
-    except Exception:  # noqa: BLE001  # defensive fallback
+    except Exception:  # defensive fallback  # noqa: BLE001
         ssot_pct, total, has = 0, 0, 0
 
     decisions_json = json.dumps(

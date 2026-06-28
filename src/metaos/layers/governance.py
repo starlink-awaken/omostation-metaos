@@ -182,7 +182,7 @@ class MetaGovernance:
         if self._on_rule_changed:
             try:
                 self._on_rule_changed(prop.rule_id)
-            except Exception as e:  # noqa: BLE001  # defensive fallback
+            except Exception as e:  # defensive fallback  # noqa: BLE001
                 return {"status": "warning", "message": f"规则已批准但生效失败: {e}"}
 
         return {
@@ -214,7 +214,7 @@ class MetaGovernance:
                 if self._on_rule_changed:
                     try:
                         self._on_rule_changed(backup["rule_id"])
-                    except Exception:  # noqa: BLE001  # defensive fallback
+                    except Exception:  # defensive fallback  # noqa: BLE001
                         pass
                 return {
                     "status": "rolled_back",
@@ -246,7 +246,7 @@ class MetaGovernance:
                 prop = RuleChangeProposal(**pdata)
                 self._proposals[pid] = prop
             self._change_log = state.get("change_log", [])
-        except Exception:  # noqa: BLE001  # defensive fallback
+        except Exception:  # defensive fallback  # noqa: BLE001
             pass  # 首次启动无数据
 
     def _persist(self):

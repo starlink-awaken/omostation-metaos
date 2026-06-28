@@ -54,10 +54,10 @@ def get_cards_context() -> str:
                     if isinstance(fm, dict):
                         if fm.get("status") not in ("closed", "done") and fm.get("priority") == "P0":
                             active_p0.append(f"{fm.get('title', f.stem)} (Status: {fm.get('status', 'open')})")
-            except Exception as e:  # noqa: BLE001  # defensive fallback
+            except Exception as e:  # defensive fallback  # noqa: BLE001
                 logger.debug(f"Skipping malformed CARDS file {f.name}: {e}")
                 continue
-    except Exception as e:  # noqa: BLE001  # defensive fallback
+    except Exception as e:  # defensive fallback  # noqa: BLE001
         logger.warning(f"Failed to read CARDS: {e}")
         return ""
 

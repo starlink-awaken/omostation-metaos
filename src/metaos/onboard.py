@@ -29,7 +29,7 @@ def _load_state() -> dict:
     if ONBOARD_FILE.exists():
         try:
             return json.loads(ONBOARD_FILE.read_text())
-        except Exception:  # noqa: BLE001  # defensive fallback
+        except Exception:  # defensive fallback  # noqa: BLE001
             pass
     return {"day": 0, "last_active": None, "completed": False}
 

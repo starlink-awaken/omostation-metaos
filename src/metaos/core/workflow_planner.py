@@ -37,7 +37,7 @@ def _load_templates():
                 data.get("default_template", []),
                 data.get("system_prompt", "")
             )
-    except Exception as e:  # noqa: BLE001  # defensive fallback
+    except Exception as e:  # defensive fallback  # noqa: BLE001
         logger.error(f"Failed to load planner templates: {e}")
         return [], [], ""
 
@@ -135,7 +135,7 @@ class WorkflowPlanner:
 
             return result
 
-        except Exception as e:  # noqa: BLE001  # defensive fallback
+        except Exception as e:  # defensive fallback  # noqa: BLE001
             logger.warning(f"LLM planning failed: {e}")
             return None
 
@@ -156,7 +156,7 @@ class WorkflowPlanner:
                         )
                         if test.status_code == 200:
                             return a
-        except Exception:  # noqa: BLE001  # defensive fallback
+        except Exception:  # defensive fallback  # noqa: BLE001
             pass
         return None
 

@@ -102,7 +102,7 @@ class SEngine:
         task = Task(task_id=pid, h_id=proposer, task_type="reasoning", input=f"[社区提案通过] {title}: {content[:100]}")
         try:
             level, reason, deadline = self.gate.evaluate(task)
-        except Exception:  # noqa: BLE001  # defensive fallback
+        except Exception:  # defensive fallback  # noqa: BLE001
             level, _reason, _deadline = DecisionLevel.GREEN, "社区共识", None
 
         # 3. 生成决策日志
@@ -261,7 +261,7 @@ class SEngine:
             # Step 1: 权限判定
             try:
                 level, reason, deadline = self.gate.evaluate(task)
-            except Exception as e:  # noqa: BLE001  # defensive fallback
+            except Exception as e:  # defensive fallback  # noqa: BLE001
                 return self._safely_fail(task, "gate_error", str(e))
 
             if level == DecisionLevel.RED:
@@ -284,7 +284,7 @@ class SEngine:
                         "h_id": self._current_h_id,
                         "message": "无可用模型（M 全量不可用，建议切换离线模式）",
                     }
-            except Exception as e:  # noqa: BLE001  # defensive fallback
+            except Exception as e:  # defensive fallback  # noqa: BLE001
                 return self._safely_fail(task, "router_error", str(e))
 
             # P1：附加上下文——最近原则
@@ -293,13 +293,13 @@ class SEngine:
                 if history:
                     ctx = "\n".join([f"- {p.content[:80]}" for p in history])
                     task.input += f"\n\n【已有原则参考】\n{ctx}"
-            except Exception:  # noqa: BLE001  # defensive fallback
+            except Exception:  # defensive fallback  # noqa: BLE001
                 pass
 
             # Step 3: M 执行
             try:
                 result = self.m.call(task, model_ids[0])
-            except Exception as e:  # noqa: BLE001  # defensive fallback
+            except Exception as e:  # defensive fallback  # noqa: BLE001
                 return self._safely_fail(task, "m_error", str(e))
 
             # Step 4: 免疫检测
@@ -307,7 +307,7 @@ class SEngine:
                 recent = self.d.get_decisions(self._current_h_id, 10)
                 principles = self.d.get_principles()
                 immune_level, immune_msg = self.immune.evaluate(self._current_h_id, task.input, recent, principles)
-            except Exception:  # noqa: BLE001  # defensive fallback
+            except Exception:  # defensive fallback  # noqa: BLE001
                 immune_level, immune_msg = ImmuneLevel.NONE, ""
 
             # Step 5: V-008 修复 —— 待确认决策同步写 DB
@@ -337,7 +337,7 @@ class SEngine:
             # Step 6: 溯源日志
             try:
                 self.d.append_trace_log(task.task_id, "completed", f"gate={level.value} immune={immune_level.value}")
-            except Exception:  # noqa: BLE001  # defensive fallback
+            except Exception:  # defensive fallback  # noqa: BLE001
                 pass  # 溯源日志失败不影响主流程
 
             return {
@@ -352,7 +352,7 @@ class SEngine:
                 "latency_ms": int((time.time() - start_time) * 1000),
             }
 
-        except Exception:  # noqa: BLE001  # defensive fallback
+        except Exception:  # defensive fallback  # noqa: BLE001
             return self._safely_fail(task, "unexpected", traceback.format_exc())
 
     def _safely_fail(self, task: Task, stage: str, detail: str) -> dict:
@@ -363,7 +363,7 @@ class SEngine:
             self._error_log.pop(0)
         try:
             self.d.append_trace_log(task.task_id, f"failed:{stage}", detail[:200])
-        except Exception:  # noqa: BLE001  # defensive fallback
+        except Exception:  # defensive fallback  # noqa: BLE001
             pass
         return {
             "status": "failed",
@@ -400,7 +400,7 @@ class SEngine:
         # TD-01 修复：先写 DB，成功后再移除 pending
         try:
             self.d.save_decision(decision)
-        except Exception as e:  # noqa: BLE001  # defensive fallback
+        except Exception as e:  # defensive fallback  # noqa: BLE001
             return {"status": "error", "message": f"决策确认失败（DB 写入错误）: {e}"}
 
         if action == "rejected":
