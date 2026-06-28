@@ -7,7 +7,7 @@
 
 ## 项目身份
 
-metaos 是 eCOS v5 5+3+1 架构的 L2 引擎面一员。2026-06-06 从 `projects/kairon/packages/metaos` 拆出为独立项目。
+metaos 是 eCOS v6 5+4+1+1 架构的 L2 引擎面一员。2026-06-06 从 `projects/kairon/packages/metaos` 拆出为独立项目。
 
 **核心职责**：
 1. **决策门控** (DecisionGate) — 红/黄/绿灯语义安全判定
