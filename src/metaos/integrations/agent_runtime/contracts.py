@@ -154,7 +154,7 @@ class AgentSession:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AgentSession":
+    def from_dict(cls, data: dict[str, Any]) -> AgentSession:
         verification = data.get("verification") or {}
         capability = data.get("capability") or {}
         target_binding = data.get("target_binding")

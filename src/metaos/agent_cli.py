@@ -17,10 +17,14 @@ from metaos.core.engine import SEngine
 from metaos.core.types import DecisionLevel
 from metaos.integrations.agent_runtime.canonical import load_canonical_session
 from metaos.integrations.agent_runtime.cli_support import prepare_payload
-from metaos.integrations.agent_runtime.contracts import AgentSession, ConfirmationStatus, SessionStatus, high_risk_commit
+from metaos.integrations.agent_runtime.contracts import (
+    AgentSession,
+    ConfirmationStatus,
+    SessionStatus,
+    high_risk_commit,
+)
 from metaos.integrations.agent_runtime.provider_context import build_provider_context
 from metaos.integrations.agent_runtime.service import AgentRuntimeService
-
 
 ACCESS_LEVELS = ["owner", "private", "shared", "public"]
 MAX_EVIDENCE_BUNDLE_BYTES = 1_000_000

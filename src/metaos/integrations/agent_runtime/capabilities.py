@@ -11,7 +11,8 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from .contracts import AgentSession, ExecutionMode, OperationalRisk
-from .mcp_policy import parse_mcp_requests, requested_mcp_servers as _requested_mcp_servers
+from .mcp_policy import parse_mcp_requests
+from .mcp_policy import requested_mcp_servers as _requested_mcp_servers
 
 
 @dataclass(frozen=True)
