@@ -30,8 +30,8 @@ metaos 是 eCOS v6 5+4+1+1 架构的 L2 引擎面一员。2026-06-06 从 `projec
 
 | 层 | 模块 | 文件 | 职责 |
 |----|------|------|------|
-| **入口** | CLI | `cli/__init__.py` | 14 子命令 + REPL |
-| | MCP | `mcp_server.py` | 11 tools, stdio |
+| **入口** | CLI | `cli/__init__.py` | 子命令 (见 project-registry.yaml: metaos) + REPL |
+| | MCP | `mcp_server.py` | MCP tools (见 project-registry.yaml: metaos), stdio |
 | **编排** | SEngine | `core/engine.py` | 核心编排 (515 行) |
 | | Workflow | `core/workflow.py` | DAG 执行引擎 |
 | | Planner | `core/workflow_planner.py` | LLM + 模式库双路规划 |

@@ -34,8 +34,8 @@ python3 src/metaos/metaos.py interactive
 
 | 模块 | 文件 | 行数 | 职责 |
 |------|------|------|------|
-| CLI | `cli/__init__.py` | 355 | 14 子命令 + REPL 交互 |
-| MCP | `mcp_server.py` | 479 | 11 tools, stdio JSON-RPC |
+| CLI | `cli/__init__.py` | 355 | 子命令 (见 project-registry.yaml: metaos) + REPL 交互 |
+| MCP | `mcp_server.py` | 479 | MCP tools (见 project-registry.yaml: metaos), stdio JSON-RPC |
 | SEngine | `core/engine.py` | 515 | 六步编排核心 |
 | Workflow | `core/workflow.py` | 297 | DAG 执行 + 重试 + 超时 |
 | Workflow Planner | `core/workflow_planner.py` | 221 | LLM + 模式库双路规划 |
@@ -102,8 +102,8 @@ uv run pytest tests/integration/test_chaos_workflow.py -v
 - `src/metaos/a2a/` — A2A 协议
 - `src/metaos/scenarios/` — 8 个白盒场景
 - `src/metaos/config/` — 外部化规则配置
-- `tests/` — 单元测试 (5 文件)
-- `tests/integration/` — 集成测试 (1 文件)
+- `tests/` — 单元测试 (见源码)
+- `tests/integration/` — 集成测试 (见源码)
 
 ## Gotchas
 
