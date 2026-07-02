@@ -38,3 +38,7 @@
 - 项目源码：`projects/metaos/`
 - 入口定义：`projects/metaos/pyproject.toml` 或 `package.json`
 - 测试：`cd projects/metaos && uv run pytest tests/ -q`
+
+## 架构演进与项目边界索引
+
+参见工作区架构演进与项目边界：[`../../docs/ARCHITECTURE-EVOLUTION.md`](../../docs/ARCHITECTURE-EVOLUTION.md)
