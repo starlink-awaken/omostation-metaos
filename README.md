@@ -1,5 +1,7 @@
 # MetaOS
 
+🌐 [简体中文](README.zh.md)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Contributing](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Security](https://img.shields.io/badge/security-policy-blue.svg)](SECURITY.md)
@@ -88,6 +90,9 @@ metaos/
     └── test_unit.py
 ```
 ## Project Governance
+
+- [Governance](GOVERNANCE.md)
+- [Support](SUPPORT.md)
 
 - [Contributing](CONTRIBUTING.md)
 - [Security Policy](SECURITY.md)
