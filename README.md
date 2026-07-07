@@ -91,6 +91,9 @@ metaos/
 ```
 ## Project Governance
 
+- [Maintainers](MAINTAINERS.md)
+- [Acknowledgments](ACKNOWLEDGMENTS.md)
+
 - [Development](docs/DEVELOPMENT.md)
 - [Release Process](RELEASE.md)
 
