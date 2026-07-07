@@ -81,3 +81,10 @@ metaos/
     ├── test_l2_controller.py
     └── test_unit.py
 ```
+## Project Governance
+
+- [Contributing](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
+- [License](LICENSE)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
