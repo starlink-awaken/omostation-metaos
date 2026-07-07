@@ -1,4 +1,10 @@
-# MetaOS — 编排/治理层
+# MetaOS
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Contributing](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Security](https://img.shields.io/badge/security-policy-blue.svg)](SECURITY.md)
+[![Python](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
+[![uv](https://img.shields.io/badge/uv-package%20manager-purple.svg)](https://docs.astral.sh/uv/)
 
 > 独立项目 · 从 omostation kairon monorepo 拆出 (P30-W1-METAOS-EXTRACT, 2026-06-06)
 > 架构归属: L2 编排引擎 (见 `.omo/_knowledge/management/architecture-final-state-v3.md`)
