@@ -52,8 +52,12 @@ metaos-mcp                     # 启动 MCP stdio 服务 (JSON-RPC)
 
 ## 依赖关系
 
-- **被依赖**: 0（自包含）
-- **依赖**: fastmcp, structlog
+- **被依赖**: `cockpit` (L3 入口)、`agora` (I0 路由，可选)
+- **依赖**:
+  - 外部: `fastmcp`, `structlog`, `pyyaml`, `requests`
+  - Workspace 内: `agora` (A2A/MCP bootstrap), `bus-foundation` (事件总线), `l4-kernel` (L4 域/KEMS 卡片面)
+
+> 注：虽然核心引擎可独立运行，但完整功能依赖上述 workspace 内项目，具体见 `pyproject.toml`。
 
 ## 迁移历史
 
