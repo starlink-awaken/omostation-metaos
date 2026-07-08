@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from agora.mcp.mcp_bootstrap import get_data_dir  # type: ignore[import-not-found]
+from metaos.adapters.agora import get_data_dir  # type: ignore[import-not-found]
 
 
 @dataclass
@@ -125,7 +125,7 @@ class TaskManager:
                 "status": task.status,
                 "event": event,
             })
-        except Exception:  # defensive fallback  # noqa: BLE001
+        except Exception:  # defensive fallback
             # 审计失败不影响主流程
             pass
 
@@ -265,7 +265,7 @@ class TaskManager:
             )
             # result is already a dict from router.route()
             self.update_task(task_id, "completed", result=result.get("data", result))
-        except Exception as e:  # defensive fallback  # noqa: BLE001
+        except Exception as e:  # defensive fallback
             self.update_task(task_id, "failed", error=str(e)[:500])
 
         return self._tasks.get(task_id)
