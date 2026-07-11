@@ -16,20 +16,23 @@ from typing import Any
 from bus_foundation.facade import event as bus_event
 
 
+def _get_trace_id() -> str | None:
+    """Try to inherit trace_id from bus-foundation R94 context."""
+    try:
+        from bus_foundation.observability import get_current_trace_id
+        return get_current_trace_id()
+    except ImportError:
+        return None
+
+
 def publish_node_event(
     workflow_id: str,
     node_id: str,
     status: str,
     payload: dict[str, Any] | None = None,
 ) -> str:
-    """Publish a workflow node status event via bus facade.
-
-    Returns event_id.
-    """
-    trace_id = f"metaos-{uuid.uuid4().hex[:6]}"
+    trace_id = _get_trace_id() or f"metaos-{uuid.uuid4().hex[:6]}"
     topic = f"node_{status}"
-
-    # Facade returns None, so we return trace_id to maintain return type signature
     bus_event.publish(
         topic=topic,
         payload={
@@ -39,6 +42,6 @@ def publish_node_event(
             **(payload or {}),
         },
         source_uri="bos://governance/metaos_workflow",
-        trace_id=trace_id
+        trace_id=trace_id,
     )
     return trace_id
