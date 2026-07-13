@@ -254,7 +254,23 @@ class Workflow:
     # ── SSE Publishing ─────────────────────────────────────────────────────
 
     def _publish_event(self, node: WorkflowNode):
-        """发布节点状态 SSE 事件到 Agora 网格"""
+        """Publish a node status event (Round 2: bus-foundation primary,
+        HTTP fallback for backward compat).
+
+        Primary path: bus_foundation.facade.event.publish with topic
+        ``metaos:node:<status>`` (e.g. ``metaos:node:completed``).
+        Falls back to HTTP POST to ``$AGORA_API_URL/v1/events`` when
+        bus-foundation is unavailable or METAOS_LEGACY_AGORA_HTTP=1.
+        """
+        topic = f"metaos:node:{node.status}"
+        payload = {
+            "workflow_id": self.workflow_id,
+            "node_id": node.node_id,
+            "status": node.status,
+        }
+        if self._bus_publish(topic, payload):
+            return
+        # Legacy fallback: HTTP POST to agora /v1/events
         try:
             requests.post(
                 f"{_AGORA_API_URL}/v1/events",
@@ -262,20 +278,28 @@ class Workflow:
                     "source": "metaos_workflow",
                     "target": node.task_type,
                     "event_type": f"node_{node.status}",
-                    "payload": {
-                        "workflow_id": self.workflow_id,
-                        "node_id": node.node_id,
-                        "status": node.status,
-                    }
+                    "payload": payload,
                 },
                 headers={"Authorization": "Bearer omo_core_token"},
-                timeout=2
+                timeout=2,
             )
         except Exception as e:  # defensive fallback  # noqa: BLE001
             logger.warning(f"SSE publish failed for {node.node_id}: {e}")
 
     def _publish_human_approval_event(self, node: WorkflowNode):
-        """Gap #2: 广播 human_approval_required 事件，等待人工介入"""
+        """Gap #2: broadcast human_approval_required event (Round 2: bus first).
+
+        Primary path: bus-foundation publish on topic
+        ``metaos:node:awaiting_approval``. Falls back to legacy HTTP POST.
+        """
+        payload = {
+            "workflow_id": self.workflow_id,
+            "node_id": node.node_id,
+            "reason": node.output,
+            "approve_cmd": f"metaos approve {self.workflow_id}",
+        }
+        if self._bus_publish("metaos:node:awaiting_approval", payload):
+            return
         try:
             requests.post(
                 f"{_AGORA_API_URL}/v1/events",
@@ -283,15 +307,36 @@ class Workflow:
                     "source": "metaos_workflow",
                     "target": "human",
                     "event_type": "human_approval_required",
-                    "payload": {
-                        "workflow_id": self.workflow_id,
-                        "node_id": node.node_id,
-                        "reason": node.output,
-                        "approve_cmd": f"metaos approve {self.workflow_id}",
-                    }
+                    "payload": payload,
                 },
                 headers={"Authorization": "Bearer omo_core_token"},
-                timeout=2
+                timeout=2,
             )
         except Exception as e:  # defensive fallback  # noqa: BLE001
             logger.warning(f"Failed to publish approval event: {e}")
+
+    @staticmethod
+    def _bus_publish(topic: str, payload: dict) -> bool:
+        """Best-effort bus-foundation publish. Returns True on success.
+
+        Returns False when:
+        - bus-foundation is not installed (ImportError)
+        - METAOS_LEGACY_AGORA_HTTP=1 is set (operator wants HTTP path)
+        - publish() raised (logged at debug, never propagated)
+        """
+        if os.environ.get("METAOS_LEGACY_AGORA_HTTP") == "1":
+            return False
+        try:
+            from bus_foundation.facade import event as bus_event  # type: ignore[import-not-found]
+
+            bus_event.publish(
+                topic=topic,
+                payload=payload,
+                source_uri="bos://capability/workflow/metaos",
+            )
+            return True
+        except ImportError:
+            return False
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("metaos_bus_publish_failed topic=%s err=%s", topic, exc)
+            return False
