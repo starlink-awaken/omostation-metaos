@@ -246,10 +246,10 @@ class Workflow:
         self._publish_event(node)
         return False
 
-    # ── SSE Publishing ─────────────────────────────────────────────────────
+    # ── Event Publishing (ADR-0181 Phase 4b: unified bus_adapter) ───────────
 
     def _publish_event(self, node: WorkflowNode):
-        """发布节点状态 — bus_foundation 优先 / HTTP 回退 (ADR-0181 Phase 4b)"""
+        """发布节点状态 — bus_foundation 优先 / HTTP 回退"""
         try:
             from metaos.integrations.bus_adapter import publish_node_event
 
