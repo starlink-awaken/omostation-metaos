@@ -178,11 +178,17 @@ class AgentRuntimeService:
         self.engine.d.save_decision(decision)
 
     def _persist_session_asset(self, session: AgentSession, access_level: str) -> DigitalAsset:
+        from .integrity import attach_integrity
+
         level = AssetLevel.PRIVATE if access_level in {"owner", "private"} else AssetLevel.SHARED
+        if not session.asset_id:
+            session.asset_id = f"session-{session.session_id}"
+        payload = attach_integrity(session.to_dict())
+        session.integrity_hmac = payload.get("integrity_hmac", "")
         asset = DigitalAsset(
-            asset_id=session.asset_id or f"session-{session.session_id}",
+            asset_id=session.asset_id,
             level=level,
-            content=json.dumps(session.to_dict(), ensure_ascii=False, sort_keys=True),
+            content=json.dumps(payload, ensure_ascii=False, sort_keys=True),
             summary=f"AgentSession {session.session_id}: {session.status.value}",
             source_h_id=session.h_id or self.engine.current_h.h_id,
             asset_type="structured",

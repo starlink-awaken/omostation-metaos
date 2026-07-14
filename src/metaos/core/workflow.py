@@ -10,12 +10,7 @@
 
 import asyncio
 import logging
-import os
 from dataclasses import dataclass, field
-
-import requests
-
-_AGORA_API_URL = os.environ.get("AGORA_API_URL", "http://127.0.0.1:8080")
 
 from metaos.core.engine import SEngine
 from metaos.core.types import Task
@@ -254,44 +249,29 @@ class Workflow:
     # ── SSE Publishing ─────────────────────────────────────────────────────
 
     def _publish_event(self, node: WorkflowNode):
-        """发布节点状态 SSE 事件到 Agora 网格"""
+        """发布节点状态 — bus_foundation 优先 / HTTP 回退 (ADR-0181 Phase 4b)"""
         try:
-            requests.post(
-                f"{_AGORA_API_URL}/v1/events",
-                json={
-                    "source": "metaos_workflow",
-                    "target": node.task_type,
-                    "event_type": f"node_{node.status}",
-                    "payload": {
-                        "workflow_id": self.workflow_id,
-                        "node_id": node.node_id,
-                        "status": node.status,
-                    }
-                },
-                headers={"Authorization": "Bearer omo_core_token"},
-                timeout=2
+            from metaos.integrations.bus_adapter import publish_node_event
+
+            publish_node_event(
+                self.workflow_id,
+                node.node_id,
+                node.status,
+                task_type=node.task_type,
             )
-        except Exception as e:  # defensive fallback  # noqa: BLE001
-            logger.warning(f"SSE publish failed for {node.node_id}: {e}")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("event publish failed for %s: %s", node.node_id, e)
 
     def _publish_human_approval_event(self, node: WorkflowNode):
-        """Gap #2: 广播 human_approval_required 事件，等待人工介入"""
+        """Gap #2: human_approval_required — 经统一 bus adapter"""
         try:
-            requests.post(
-                f"{_AGORA_API_URL}/v1/events",
-                json={
-                    "source": "metaos_workflow",
-                    "target": "human",
-                    "event_type": "human_approval_required",
-                    "payload": {
-                        "workflow_id": self.workflow_id,
-                        "node_id": node.node_id,
-                        "reason": node.output,
-                        "approve_cmd": f"metaos approve {self.workflow_id}",
-                    }
-                },
-                headers={"Authorization": "Bearer omo_core_token"},
-                timeout=2
+            from metaos.integrations.bus_adapter import publish_human_approval_event
+
+            publish_human_approval_event(
+                self.workflow_id,
+                node.node_id,
+                reason=node.output or "",
+                approve_cmd=f"metaos approve {self.workflow_id}",
             )
-        except Exception as e:  # defensive fallback  # noqa: BLE001
-            logger.warning(f"Failed to publish approval event: {e}")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed to publish approval event: %s", e)

@@ -34,8 +34,16 @@ dev = [
 metaos = "metaos.cli:main"
 metaos-agent = "metaos.agent_cli:main"
 
+# Agora AdmissionPort SPI (ADR-0181)
+[project.entry-points."agora.admission"]
+metaos = "metaos.integrations.admission_provider:MetaOSAdmissionProvider"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/metaos"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/metaos/resources" = "metaos/resources"
+"src/metaos/config" = "metaos/config"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

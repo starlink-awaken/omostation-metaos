@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "source": "/Users/xiamingxing/Workspace/projects/ecos/src/ecos/ssot/mof/m1/cognitive_framework",
+  "synced_at": "2026-07-14T07:30:12.319558+00:00",
+  "file_count": 6,
+  "files": {
+    "bdsk.yaml": "b0e36d27c3ec6da243a3c5c042cb9b318a7c79930638a6a6b9f46dc6ced0ee10",
+    "gsd.yaml": "8bba1cc44301203c5445cc476f54fbf660f254567933802359a8b90fa1785019",
+    "openspec.yaml": "107a90b7a8da90932cd034764c85730d6394dc1a7853b0cd09cb20b5e6960ffd",
+    "six_hats.yaml": "8068c15101f686faf1bdcfc6715e94a9100951a7342acbe1b6a12d66db9a8a44",
+    "superpowers.yaml": "fdd334135a4639fc7fcd5fa57127a60a56fbfd51d0cc8fdfbaffa43e4977e192",
+    "workflow.yaml": "9e5eabdcfa78de83e8145b910d5fb2f91ccf3684fa1c7cd80cf55286647985a9"
+  },
+  "ssot": "ecos/ssot/mof/m1/cognitive_framework",
+  "adr": "ADR-0181"
+}

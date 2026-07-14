@@ -141,6 +141,7 @@ class AgentSession:
     evidence_bundle: dict[str, Any] = field(default_factory=dict)
     decision_id: str = ""
     asset_id: str = ""
+    integrity_hmac: str = ""  # Phase D content HMAC (signature only)
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -190,6 +191,7 @@ class AgentSession:
             evidence_bundle=dict(data.get("evidence_bundle") or {}),
             decision_id=data.get("decision_id", ""),
             asset_id=data.get("asset_id", ""),
+            integrity_hmac=data.get("integrity_hmac", ""),
         )
 
 
