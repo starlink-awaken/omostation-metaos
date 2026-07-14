@@ -30,9 +30,7 @@ def integrity_required() -> bool:
 def canonical_bytes(data: dict[str, Any]) -> bytes:
     """Stable serialization excluding the integrity field itself."""
     body = {k: v for k, v in data.items() if k != INTEGRITY_FIELD}
-    return json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
-        "utf-8"
-    )
+    return json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 def sign_session_dict(data: dict[str, Any], secret: str | None = None) -> str:

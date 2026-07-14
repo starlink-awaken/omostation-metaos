@@ -131,9 +131,7 @@ def publish_node_event(
     if mode in {"http", "both"} or (mode == "bus" and not result["bus"]):
         # bus-only failure falls back to http when mode=bus? keep strict: only both/http
         if mode in {"http", "both"}:
-            result["http"] = publish_via_http(
-                topic, body, target=task_type or "workflow"
-            )
+            result["http"] = publish_via_http(topic, body, target=task_type or "workflow")
         elif mode == "bus" and not result["bus"]:
             logger.warning("bus-only mode failed; not falling back to HTTP")
 
@@ -162,9 +160,7 @@ def publish_human_approval_event(
         result["bus"] = bool(tid)
         result["trace_id"] = tid
     if mode in {"http", "both"}:
-        result["http"] = publish_via_http(
-            "human_approval_required", payload, target="human"
-        )
+        result["http"] = publish_via_http("human_approval_required", payload, target="human")
     return result
 
 

@@ -14,7 +14,9 @@ from .contracts import (
 )
 
 
-def session_from_legacy_envelope(payload: dict[str, Any], provider: ProviderKind = ProviderKind.GENERIC) -> AgentSession:
+def session_from_legacy_envelope(
+    payload: dict[str, Any], provider: ProviderKind = ProviderKind.GENERIC
+) -> AgentSession:
     """Convert a v0.1 AgentKit envelope into the canonical session contract.
 
     This is intentionally a one-way compatibility bridge. Canonical sessions
