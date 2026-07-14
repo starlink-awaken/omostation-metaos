@@ -461,6 +461,8 @@ def handle_request(msg: dict) -> dict | None:
 
 
 def main():
+    import os
+
     logging.basicConfig(
         stream=sys.stderr,
         level=logging.INFO,
@@ -469,7 +471,17 @@ def main():
     )
     logger = logging.getLogger("metaos.mcp")
     logger.info("MetaOS MCP 服务器启动 (多 session 隔离)")
-    logger.warning("!! 此独立入口已弃用 (deprecated) !! 请使用 bos://ecos/workflow 通过 Agora 路由调用")
+    logger.warning(
+        "!! 此独立入口已弃用 (deprecated ADR-0181 Phase 2) !! "
+        "请使用 bos://ecos/workflow 与 bos://governance/metaos/*"
+    )
+    if os.environ.get("METAOS_MCP_ALLOW_STANDALONE", "0").strip() != "1":
+        logger.error(
+            "Standalone MCP disabled (ADR-0181). "
+            "Set METAOS_MCP_ALLOW_STANDALONE=1 only for legacy/debug. "
+            "Production: bos://ecos/workflow + bos://governance/metaos/*"
+        )
+        sys.exit(2)
 
     buffer = ""
     for line in sys.stdin:

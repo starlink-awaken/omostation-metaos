@@ -73,7 +73,9 @@ class AgentRuntimeService:
         session.status = SessionStatus.BLOCKED if self._must_block(session, level) else SessionStatus.PREPARED
 
         self._persist_session_asset(session, access_level)
-        decision = self._save_decision(session, level, access_level, action="blocked" if session.status == SessionStatus.BLOCKED else "prepared")
+        decision = self._save_decision(
+            session, level, access_level, action="blocked" if session.status == SessionStatus.BLOCKED else "prepared"
+        )
         session.decision_id = decision.decision_id
         self._persist_session_asset(session, access_level)
         self._trace(session, "agent_session_prepared", f"gate={level.value}; status={session.status.value}")
@@ -105,7 +107,10 @@ class AgentRuntimeService:
         """Record provider process launch only after the adapter has actually launched it."""
         if session.status != SessionStatus.PREPARED:
             raise ValueError(f"Cannot mark session running from status {session.status.value}.")
-        if session.gate_decision == DecisionLevel.YELLOW.value and session.confirmation_status != ConfirmationStatus.APPROVED:
+        if (
+            session.gate_decision == DecisionLevel.YELLOW.value
+            and session.confirmation_status != ConfirmationStatus.APPROVED
+        ):
             raise ValueError("Yellow-gate session requires human approval before provider launch.")
         session.status = SessionStatus.RUNNING
         self._persist_session_asset(session, access_level)
@@ -178,11 +183,17 @@ class AgentRuntimeService:
         self.engine.d.save_decision(decision)
 
     def _persist_session_asset(self, session: AgentSession, access_level: str) -> DigitalAsset:
+        from .integrity import attach_integrity
+
         level = AssetLevel.PRIVATE if access_level in {"owner", "private"} else AssetLevel.SHARED
+        if not session.asset_id:
+            session.asset_id = f"session-{session.session_id}"
+        payload = attach_integrity(session.to_dict())
+        session.integrity_hmac = payload.get("integrity_hmac", "")
         asset = DigitalAsset(
-            asset_id=session.asset_id or f"session-{session.session_id}",
+            asset_id=session.asset_id,
             level=level,
-            content=json.dumps(session.to_dict(), ensure_ascii=False, sort_keys=True),
+            content=json.dumps(payload, ensure_ascii=False, sort_keys=True),
             summary=f"AgentSession {session.session_id}: {session.status.value}",
             source_h_id=session.h_id or self.engine.current_h.h_id,
             asset_type="structured",

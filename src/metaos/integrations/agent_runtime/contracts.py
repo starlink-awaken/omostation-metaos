@@ -92,7 +92,9 @@ class TargetBinding:
             "expires_at": self.expires_at,
             "metadata": self.metadata,
         }
-        return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        return hashlib.sha256(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
 
     def is_expired(self, now: datetime | None = None) -> bool:
         if not self.expires_at:
@@ -141,6 +143,7 @@ class AgentSession:
     evidence_bundle: dict[str, Any] = field(default_factory=dict)
     decision_id: str = ""
     asset_id: str = ""
+    integrity_hmac: str = ""  # Phase D content HMAC (signature only)
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -190,6 +193,7 @@ class AgentSession:
             evidence_bundle=dict(data.get("evidence_bundle") or {}),
             decision_id=data.get("decision_id", ""),
             asset_id=data.get("asset_id", ""),
+            integrity_hmac=data.get("integrity_hmac", ""),
         )
 
 
@@ -210,7 +214,11 @@ def validate_session_policy(session: AgentSession) -> list[str]:
         violations.append("commit mode requires explicit success criteria.")
     if session.mode == ExecutionMode.COMMIT and not session.verification.expected_outcomes:
         violations.append("commit mode requires a verification plan.")
-    if session.risk == OperationalRisk.R4 and session.mode == ExecutionMode.COMMIT and not session.rollback_or_containment:
+    if (
+        session.risk == OperationalRisk.R4
+        and session.mode == ExecutionMode.COMMIT
+        and not session.rollback_or_containment
+    ):
         violations.append("R4 commit sessions require rollback or containment instructions.")
     if high_risk_commit(session):
         binding = session.target_binding

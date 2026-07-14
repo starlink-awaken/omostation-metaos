@@ -83,14 +83,14 @@ def _context_from_policy(
         "METAOS_GATE_DECISION": session.gate_decision,
         "METAOS_CAPABILITY_PROFILE": profile_name,
         "METAOS_ALLOWED_MCP_JSON": json.dumps(list(allowed_mcp)),
-        "METAOS_ALLOWED_MCP_TOOLS_JSON": json.dumps({server: list(tools) for server, tools in allowed_mcp_tools.items()}),
+        "METAOS_ALLOWED_MCP_TOOLS_JSON": json.dumps(
+            {server: list(tools) for server, tools in allowed_mcp_tools.items()}
+        ),
         "METAOS_CAPABILITY_POLICY_JSON": json.dumps(policy, sort_keys=True),
     }
     if session_asset_path:
         env["METAOS_SESSION_ASSET"] = session_asset_path
-    formatted_tools = ", ".join(
-        f"{server}:{'/'.join(tools)}" for server, tools in allowed_mcp_tools.items()
-    )
+    formatted_tools = ", ".join(f"{server}:{'/'.join(tools)}" for server, tools in allowed_mcp_tools.items())
     block = "\n".join(
         [
             "# MetaOS Agent Session",

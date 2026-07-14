@@ -10,12 +10,7 @@
 
 import asyncio
 import logging
-import os
 from dataclasses import dataclass, field
-
-import requests
-
-_AGORA_API_URL = os.environ.get("AGORA_API_URL", "http://127.0.0.1:8080")
 
 from metaos.core.engine import SEngine
 from metaos.core.types import Task
@@ -33,10 +28,10 @@ class WorkflowNode:
     input_prompt: str
     depends_on: list[str] = field(default_factory=list)
     output: str | None = None
-    status: str = "pending"          # pending | running | completed | failed | timed_out | awaiting_approval
-    max_retries: int = 1             # Gap #8: 最大重试次数
+    status: str = "pending"  # pending | running | completed | failed | timed_out | awaiting_approval
+    max_retries: int = 1  # Gap #8: 最大重试次数
     retry_count: int = 0
-    timeout_seconds: int = 120       # Gap #12: 节点超时（秒）
+    timeout_seconds: int = 120  # Gap #12: 节点超时（秒）
 
 
 class Workflow:
@@ -51,9 +46,9 @@ class Workflow:
     def _get_executable_nodes(self) -> list[WorkflowNode]:
         """返回所有依赖已满足且状态为 pending 的节点"""
         return [
-            node for node in self.nodes.values()
-            if node.status == "pending"
-            and all(self.nodes[dep].status == "completed" for dep in node.depends_on)
+            node
+            for node in self.nodes.values()
+            if node.status == "pending" and all(self.nodes[dep].status == "completed" for dep in node.depends_on)
         ]
 
     # ── Main Execution Loop ────────────────────────────────────────────────
@@ -61,6 +56,7 @@ class Workflow:
     async def run(self, task_description: str = "", dag_dict: dict | None = None):
         """执行工作流 DAG。集成持久化/并行/重试/超时/人工介入。"""
         import asyncio
+
         logger.info(f"Starting workflow {self.workflow_id} with {len(self.nodes)} nodes.")
 
         # Gap #1: 持久化工作流启动状态
@@ -96,9 +92,7 @@ class Workflow:
                 node_tasks[node.node_id] = task
 
             if node_tasks:
-                done, _ = await asyncio.wait(
-                    node_tasks.values(), return_when=asyncio.FIRST_COMPLETED
-                )
+                done, _ = await asyncio.wait(node_tasks.values(), return_when=asyncio.FIRST_COMPLETED)
                 for t in done:
                     # Remove finished task from tracking map
                     for nid, ntask in list(node_tasks.items()):
@@ -125,6 +119,7 @@ class Workflow:
     async def _execute_node(self, node: WorkflowNode, stop_event: asyncio.Event):
         """在独立 Task 中执行单个节点，支持重试和超时。"""
         import asyncio
+
         context = ""
         if node.depends_on:
             context = "\n【上游依赖结果】\n"
@@ -133,10 +128,7 @@ class Workflow:
 
         task_input = node.input_prompt + context
         task = Task(
-            task_id=f"{self.workflow_id}_{node.node_id}",
-            h_id="metaos",
-            task_type=node.task_type,
-            input=task_input
+            task_id=f"{self.workflow_id}_{node.node_id}", h_id="metaos", task_type=node.task_type, input=task_input
         )
 
         # Gap #8: 重试循环（指数退避）
@@ -149,18 +141,22 @@ class Workflow:
 
             node.retry_count += 1
             if node.retry_count <= node.max_retries:
-                wait = 2 ** node.retry_count
+                wait = 2**node.retry_count
                 logger.warning(f"Node {node.node_id} retry {node.retry_count}/{node.max_retries} in {wait}s")
                 await asyncio.sleep(wait)
 
         # Gap #1: checkpoint 写入 DB
         _store.update_node(
-            self.workflow_id, node.node_id, node.task_type,
-            node.input_prompt, node.depends_on, node.status, node.output or ""
+            self.workflow_id,
+            node.node_id,
+            node.task_type,
+            node.input_prompt,
+            node.depends_on,
+            node.status,
+            node.output or "",
         )
 
-    async def _try_execute(self, node: WorkflowNode, task: Task, task_input: str,
-                     stop_event: asyncio.Event) -> bool:
+    async def _try_execute(self, node: WorkflowNode, task: Task, task_input: str, stop_event: asyncio.Event) -> bool:
         """尝试执行节点一次，返回是否成功。"""
         if node.task_type == "research":
             return await self._execute_research(node, task_input)
@@ -170,14 +166,20 @@ class Workflow:
     async def _execute_research(self, node: WorkflowNode, task_input: str) -> bool:
         """委托给 Cockpit Research Agent 执行（含超时）"""
         import asyncio
+
         logger.info(f"Delegating {node.node_id} to Cockpit Research Agent...")
 
         try:
             proc = await asyncio.create_subprocess_exec(
-                "uv", "run", "--directory", "projects/cockpit", "cockpit",
-                "research", task_input[:200],
+                "uv",
+                "run",
+                "--directory",
+                "projects/cockpit",
+                "cockpit",
+                "research",
+                task_input[:200],
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
             )
 
             try:
@@ -191,12 +193,12 @@ class Workflow:
                 return False
 
             if returncode == 0:
-                node.output = stdout.decode('utf-8')
+                node.output = stdout.decode("utf-8")
                 node.status = "completed"
                 self._publish_event(node)
                 return True
 
-            node.output = stderr.decode('utf-8')
+            node.output = stderr.decode("utf-8")
             node.status = "failed"
             self._publish_event(node)
             return False
@@ -207,8 +209,7 @@ class Workflow:
             self._publish_event(node)
             return False
 
-    async def _execute_engine(self, node: WorkflowNode, task: Task,
-                        stop_event: asyncio.Event) -> bool:
+    async def _execute_engine(self, node: WorkflowNode, task: Task, stop_event: asyncio.Event) -> bool:
         """通过 SEngine 执行节点（含超时和 RED 门控处理）"""
         import asyncio
 
@@ -251,92 +252,32 @@ class Workflow:
         self._publish_event(node)
         return False
 
-    # ── SSE Publishing ─────────────────────────────────────────────────────
+    # ── Event Publishing (ADR-0181 Phase 4b: unified bus_adapter) ───────────
 
     def _publish_event(self, node: WorkflowNode):
-        """Publish a node status event (Round 2: bus-foundation primary,
-        HTTP fallback for backward compat).
-
-        Primary path: bus_foundation.facade.event.publish with topic
-        ``metaos:node:<status>`` (e.g. ``metaos:node:completed``).
-        Falls back to HTTP POST to ``$AGORA_API_URL/v1/events`` when
-        bus-foundation is unavailable or METAOS_LEGACY_AGORA_HTTP=1.
-        """
-        topic = f"metaos:node:{node.status}"
-        payload = {
-            "workflow_id": self.workflow_id,
-            "node_id": node.node_id,
-            "status": node.status,
-        }
-        if self._bus_publish(topic, payload):
-            return
-        # Legacy fallback: HTTP POST to agora /v1/events
+        """发布节点状态 — bus_foundation 优先 / HTTP 回退"""
         try:
-            requests.post(
-                f"{_AGORA_API_URL}/v1/events",
-                json={
-                    "source": "metaos_workflow",
-                    "target": node.task_type,
-                    "event_type": f"node_{node.status}",
-                    "payload": payload,
-                },
-                headers={"Authorization": "Bearer omo_core_token"},
-                timeout=2,
+            from metaos.integrations.bus_adapter import publish_node_event
+
+            publish_node_event(
+                self.workflow_id,
+                node.node_id,
+                node.status,
+                task_type=node.task_type,
             )
-        except Exception as e:  # defensive fallback  # noqa: BLE001
-            logger.warning(f"SSE publish failed for {node.node_id}: {e}")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("event publish failed for %s: %s", node.node_id, e)
 
     def _publish_human_approval_event(self, node: WorkflowNode):
-        """Gap #2: broadcast human_approval_required event (Round 2: bus first).
-
-        Primary path: bus-foundation publish on topic
-        ``metaos:node:awaiting_approval``. Falls back to legacy HTTP POST.
-        """
-        payload = {
-            "workflow_id": self.workflow_id,
-            "node_id": node.node_id,
-            "reason": node.output,
-            "approve_cmd": f"metaos approve {self.workflow_id}",
-        }
-        if self._bus_publish("metaos:node:awaiting_approval", payload):
-            return
+        """Gap #2: human_approval_required — 经统一 bus adapter"""
         try:
-            requests.post(
-                f"{_AGORA_API_URL}/v1/events",
-                json={
-                    "source": "metaos_workflow",
-                    "target": "human",
-                    "event_type": "human_approval_required",
-                    "payload": payload,
-                },
-                headers={"Authorization": "Bearer omo_core_token"},
-                timeout=2,
+            from metaos.integrations.bus_adapter import publish_human_approval_event
+
+            publish_human_approval_event(
+                self.workflow_id,
+                node.node_id,
+                reason=node.output or "",
+                approve_cmd=f"metaos approve {self.workflow_id}",
             )
-        except Exception as e:  # defensive fallback  # noqa: BLE001
-            logger.warning(f"Failed to publish approval event: {e}")
-
-    @staticmethod
-    def _bus_publish(topic: str, payload: dict) -> bool:
-        """Best-effort bus-foundation publish. Returns True on success.
-
-        Returns False when:
-        - bus-foundation is not installed (ImportError)
-        - METAOS_LEGACY_AGORA_HTTP=1 is set (operator wants HTTP path)
-        - publish() raised (logged at debug, never propagated)
-        """
-        if os.environ.get("METAOS_LEGACY_AGORA_HTTP") == "1":
-            return False
-        try:
-            from bus_foundation.facade import event as bus_event  # type: ignore[import-not-found]
-
-            bus_event.publish(
-                topic=topic,
-                payload=payload,
-                source_uri="bos://capability/workflow/metaos",
-            )
-            return True
-        except ImportError:
-            return False
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("metaos_bus_publish_failed topic=%s err=%s", topic, exc)
-            return False
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed to publish approval event: %s", e)

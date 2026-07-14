@@ -1,0 +1,28 @@
+# Example user capability profiles (ADR-0181 Phase 4c / Agent Runtime Phase D)
+# Copy to ~/.metaos/capability-profiles.yaml or set METAOS_CAPABILITY_PROFILES.
+#
+# Overlay merges into built-ins by name (override or add).
+
+profiles:
+  # Example: stricter core (no network ever — already default)
+  # core:
+  #   allowed_risks: [R0, R1]
+  #   allowed_modes: [observe, propose]
+  #   codex_sandbox: read-only
+  #   codex_approval: on-request
+  #   network: false
+  #   isolate_git_worktree: false
+  #   allow_explicit_mcp: false
+  #   require_human_confirmation_for_launch: false
+  #   description: "Stricter core overlay"
+
+  research-web:
+    allowed_risks: [R1]
+    allowed_modes: [observe, propose]
+    codex_sandbox: read-only
+    codex_approval: on-request
+    network: true
+    isolate_git_worktree: false
+    allow_explicit_mcp: true
+    require_human_confirmation_for_launch: false
+    description: "Read-only research with network + explicit MCP (example overlay)"

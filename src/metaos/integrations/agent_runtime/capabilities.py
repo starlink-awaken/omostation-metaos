@@ -3,16 +3,23 @@
 Profiles are intentionally conservative. They define the maximum authority an
 adapter may project into a provider; they do not grant authority on their own.
 The existing MetaOS gate can still reduce a session to blocked.
+
+Phase D: YAML overlay via METAOS_CAPABILITY_PROFILES or ~/.metaos/capability-profiles.yaml
 """
 
 from __future__ import annotations
 
+import logging
+import os
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Any
 
 from .contracts import AgentSession, ExecutionMode, OperationalRisk
 from .mcp_policy import parse_mcp_requests
 from .mcp_policy import requested_mcp_servers as _requested_mcp_servers
+
+logger = logging.getLogger("metaos.agent_runtime.capabilities")
 
 
 @dataclass(frozen=True)
@@ -123,7 +130,81 @@ def default_profile_name(session: AgentSession) -> str:
     return "core"
 
 
+def _profile_policy_path() -> Path | None:
+    env = os.environ.get("METAOS_CAPABILITY_PROFILES", "").strip()
+    if env:
+        p = Path(env).expanduser()
+        return p if p.is_file() else None
+    home = Path.home() / ".metaos" / "capability-profiles.yaml"
+    if home.is_file():
+        return home
+    pkg = Path(__file__).resolve().parent.parent.parent / "config" / "capability-profiles.yaml"
+    return pkg if pkg.is_file() else None
+
+
+def _parse_profile_entry(name: str, raw: dict[str, Any]) -> CapabilityProfile:
+    required = (
+        "allowed_risks",
+        "allowed_modes",
+        "codex_sandbox",
+        "codex_approval",
+        "network",
+        "isolate_git_worktree",
+        "allow_explicit_mcp",
+        "require_human_confirmation_for_launch",
+    )
+    missing = [k for k in required if k not in raw]
+    if missing:
+        raise ValueError(f"profile {name} missing fields: {missing}")
+    return CapabilityProfile(
+        name=name,
+        allowed_risks=tuple(OperationalRisk(x) for x in raw["allowed_risks"]),
+        allowed_modes=tuple(ExecutionMode(x) for x in raw["allowed_modes"]),
+        codex_sandbox=str(raw["codex_sandbox"]),
+        codex_approval=str(raw["codex_approval"]),
+        network=bool(raw["network"]),
+        isolate_git_worktree=bool(raw["isolate_git_worktree"]),
+        allow_explicit_mcp=bool(raw["allow_explicit_mcp"]),
+        require_human_confirmation_for_launch=bool(raw["require_human_confirmation_for_launch"]),
+        description=str(raw.get("description") or f"User profile {name}"),
+    )
+
+
+_profiles_overlay_loaded = False
+
+
+def load_profile_overlays(force: bool = False) -> dict[str, CapabilityProfile]:
+    """Merge YAML overlays into PROFILES by name."""
+    global _profiles_overlay_loaded
+    if _profiles_overlay_loaded and not force:
+        return PROFILES
+    path = _profile_policy_path()
+    _profiles_overlay_loaded = True
+    if not path:
+        return PROFILES
+    try:
+        import yaml
+
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception as e:  # noqa: BLE001
+        logger.warning("capability profile file unreadable %s: %s", path, e)
+        return PROFILES
+    profiles = data.get("profiles") if isinstance(data, dict) else None
+    if not isinstance(profiles, dict):
+        logger.warning("capability profile file missing 'profiles' map: %s", path)
+        return PROFILES
+    for name, raw in profiles.items():
+        if not isinstance(raw, dict):
+            continue
+        try:
+            PROFILES[str(name)] = _parse_profile_entry(str(name), raw)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("invalid profile %s: %s", name, e)
+    return PROFILES
+
+
 def resolve_profile(session: AgentSession) -> CapabilityProfile:
+    load_profile_overlays()
     name = session.capability.profile or default_profile_name(session)
     try:
         return PROFILES[name]
