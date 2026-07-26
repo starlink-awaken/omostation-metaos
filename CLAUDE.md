@@ -52,7 +52,7 @@ metaos 是 eCOS v6 5+4+1+1 架构的 L2 引擎面一员。2026-06-06 从 `projec
 ```bash
 cd projects/metaos
 
-# 测试 (100% 通过)
+# 测试 (计数见 pytest tests/ 实际输出 / CI, 不复制数字)
 uv run pytest tests/ -q
 
 # 场景验证

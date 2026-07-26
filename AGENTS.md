@@ -7,7 +7,7 @@
 ```bash
 cd projects/metaos
 
-# 测试 (100% 通过, 188 tests)
+# 测试 (计数见 pytest tests/ 实际输出 / CI, 不在文档复制数字 — P0-3 指针化)
 uv run pytest tests/ -q
 
 # 单个测试

@@ -16,6 +16,12 @@ import sys
 import threading
 from datetime import datetime
 from pathlib import Path
+
+try:
+    from importlib.metadata import version as _pkg_version
+    _VERSION = _pkg_version("metaos")
+except Exception:  # noqa: BLE001
+    _VERSION = "0.0.0"
 from typing import Any
 
 from metaos.cli import CLI  # type: ignore[import-not-found]
@@ -395,7 +401,7 @@ def handle_request(msg: dict) -> dict | None:
             {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}, "resources": {}},
-                "serverInfo": {"name": "metaos-engine", "version": "7.1.0"},
+                "serverInfo": {"name": "metaos-engine", "version": _VERSION},
             },
             msg_id,
         )

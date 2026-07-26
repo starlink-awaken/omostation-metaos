@@ -49,11 +49,12 @@ def test_publish_event_uses_bus_foundation(
 
     be = EventBusBackend()
     received: list = []
-    be.subscribe("metaos:*", lambda env: received.append(env))
+    be.subscribe("node_*", lambda env: received.append(env))
     monkeypatch.setitem(_backends, "eventbus", be)
+    monkeypatch.setenv("METAOS_EVENT_BUS", "bus")
 
     # Patch requests.post to detect any HTTP fallback (should NOT be called)
-    with patch("metaos.core.workflow.requests.post") as http_post:
+    with patch("metaos.integrations.bus_adapter.requests.post") as http_post:
         from metaos.core.workflow import Workflow
 
         wf = Workflow.__new__(Workflow)  # bypass __init__
@@ -62,7 +63,7 @@ def test_publish_event_uses_bus_foundation(
 
         assert _wait_for(lambda: len(received) >= 1)
         env = received[0]
-        assert env.topic == "metaos:node:completed"
+        assert env.topic == "node_completed"
         assert env.payload["workflow_id"] == "wf-test"
         assert env.payload["node_id"] == "n1"
         # No HTTP fallback should have been called
@@ -78,10 +79,11 @@ def test_publish_human_approval_uses_bus_foundation(
 
     be = EventBusBackend()
     received: list = []
-    be.subscribe("metaos:*", lambda env: received.append(env))
+    be.subscribe("human_*", lambda env: received.append(env))
     monkeypatch.setitem(_backends, "eventbus", be)
+    monkeypatch.setenv("METAOS_EVENT_BUS", "bus")
 
-    with patch("metaos.core.workflow.requests.post") as http_post:
+    with patch("metaos.integrations.bus_adapter.requests.post") as http_post:
         from metaos.core.workflow import Workflow
 
         wf = Workflow.__new__(Workflow)
@@ -92,7 +94,7 @@ def test_publish_human_approval_uses_bus_foundation(
 
         assert _wait_for(lambda: len(received) >= 1)
         env = received[0]
-        assert env.topic == "metaos:node:awaiting_approval"
+        assert env.topic == "human_approval_required"
         assert env.payload["reason"] == "needs review"
         assert not http_post.called
 
@@ -108,9 +110,9 @@ def test_legacy_env_flag_forces_http_fallback(
     received: list = []
     be.subscribe("metaos:*", lambda env: received.append(env))
     monkeypatch.setitem(_backends, "eventbus", be)
-    monkeypatch.setenv("METAOS_LEGACY_AGORA_HTTP", "1")
+    monkeypatch.setenv("METAOS_EVENT_BUS", "http")
 
-    with patch("metaos.core.workflow.requests.post") as http_post:
+    with patch("metaos.integrations.bus_adapter.requests.post") as http_post:
         http_post.return_value.status_code = 200
         from metaos.core.workflow import Workflow
 
@@ -135,7 +137,7 @@ def test_publish_event_survives_bus_foundation_missing(
     saved = sys.modules.pop("bus_foundation.facade", None)
     sys.modules["bus_foundation.facade"] = None  # type: ignore[assignment]
     try:
-        with patch("metaos.core.workflow.requests.post") as http_post:
+        with patch("metaos.integrations.bus_adapter.requests.post") as http_post:
             http_post.return_value.status_code = 200
             from metaos.core.workflow import Workflow
 
@@ -158,7 +160,7 @@ def test_publish_event_survives_publish_exception(
         raise RuntimeError("simulated")
 
     monkeypatch.setattr(facade_event, "publish", _boom)
-    with patch("metaos.core.workflow.requests.post") as http_post:
+    with patch("metaos.integrations.bus_adapter.requests.post") as http_post:
         http_post.return_value.status_code = 200
         from metaos.core.workflow import Workflow
 
