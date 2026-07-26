@@ -116,15 +116,6 @@ class CLI:
         print(f"消息: {result.get('message', '')}")
         return level
 
-    def status(self):
-        """体系健康度"""
-        health = self.engine.system_health()
-        print("\n📊 体系健康度")
-        print(f"{'=' * 40}")
-        for k, v in health.items():
-            print(f"  {k}: {v}")
-        return health
-
     def trace(self, decision_id: str = ""):
         """查询决策日志"""
         if decision_id:
@@ -138,7 +129,7 @@ class CLI:
                 flag = "⏳" if d.outcome_pending_review else "✅"
                 print(f"  {flag} {d.timestamp.strftime('%m-%d %H:%M')} [{d.level}] {d.description[:40]}")
 
-    def status(self):  # noqa: F811
+    def status(self):
         """体系健康度——含后端信息"""
         health = self.engine.system_health()
         print("\n📊 体系健康度")
