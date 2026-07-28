@@ -1,4 +1,8 @@
-"""L2 Controller — PID + Hysteresis for capability layer (READONLY prototype)"""
+"""L2 Controller — PID + Hysteresis for capability layer.
+
+ADR-0252 O-D2: **experimental** — 无生产消费者时保持降级；simulation only。
+READONLY prototype; not a committed control plane.
+"""
 
 from __future__ import annotations
 

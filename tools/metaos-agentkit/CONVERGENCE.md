@@ -2,6 +2,10 @@
 
 `metaos-agentkit` is a provider adapter, not an orchestration runtime.
 
+> **ADR-0252 O-D3 (2026-07-28)**: 降级为 **reference implementation**。
+> 不在本季度强制兑现 v0.2 会话门控；与 P84 协作主轴资源竞争时，以协作/路由为先。
+> 真要强制 prepare/finalize 门控须另立 ADR + 排期。
+
 ## Current rule
 
 For governed runs, create a canonical `AgentSession` through the root MetaOS bridge:
