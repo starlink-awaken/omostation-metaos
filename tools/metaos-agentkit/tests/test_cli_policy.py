@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from metaos_agentkit.cli import _inferred_profile
-from metaos_agentkit.service import _validate_provider_args
+from metaos_agentkit.cli import _inferred_profile  # type: ignore[reportMissingImports]
+from metaos_agentkit.service import _validate_provider_args  # type: ignore[reportMissingImports]
 
 
 @pytest.mark.parametrize(

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from metaos_agentkit.evidence import capture_finalization_evidence
+from metaos_agentkit.evidence import capture_finalization_evidence  # type: ignore[reportMissingImports]
 
 
 def test_finalization_evidence_records_audit_hashes_and_provider_exit(tmp_path: Path) -> None:

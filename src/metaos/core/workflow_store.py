@@ -51,63 +51,69 @@ class WorkflowStore:
         """新建工作流记录"""
         now = datetime.now().isoformat()
         with self._conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO workflows
                 (workflow_id, task_description, status, created_at, updated_at, dag_json)
                 VALUES (?, ?, 'running', ?, ?, ?)
-            """, (workflow_id, task_description, now, now, json.dumps(dag_dict, ensure_ascii=False)))
+            """,
+                (workflow_id, task_description, now, now, json.dumps(dag_dict, ensure_ascii=False)),
+            )
 
-    def update_node(self, workflow_id: str, node_id: str, task_type: str,
-                    input_prompt: str, depends_on: list, status: str, output: str = ""):
+    def update_node(
+        self,
+        workflow_id: str,
+        node_id: str,
+        task_type: str,
+        input_prompt: str,
+        depends_on: list,
+        status: str,
+        output: str = "",
+    ):
         """更新节点状态（checkpoint）"""
         now = datetime.now().isoformat()
         with self._conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO workflow_nodes
                 (workflow_id, node_id, task_type, input_prompt, depends_on, status, output, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (workflow_id, node_id, task_type, input_prompt,
-                  json.dumps(depends_on), status, output or "", now))
+            """,
+                (workflow_id, node_id, task_type, input_prompt, json.dumps(depends_on), status, output or "", now),
+            )
 
     def complete_workflow(self, workflow_id: str, status: str = "completed"):
         """标记工作流最终状态"""
         now = datetime.now().isoformat()
         with self._conn() as conn:
-            conn.execute(
-                "UPDATE workflows SET status=?, updated_at=? WHERE workflow_id=?",
-                (status, now, workflow_id)
-            )
+            conn.execute("UPDATE workflows SET status=?, updated_at=? WHERE workflow_id=?", (status, now, workflow_id))
 
     def list_workflows(self, limit: int = 20) -> list[dict]:
         """查询历史工作流列表"""
         with self._conn() as conn:
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT workflow_id, task_description, status, created_at, updated_at
                 FROM workflows ORDER BY created_at DESC LIMIT ?
-            """, (limit,)).fetchall()
-        return [
-            {"id": r[0], "task": r[1], "status": r[2], "created": r[3], "updated": r[4]}
-            for r in rows
-        ]
+            """,
+                (limit,),
+            ).fetchall()
+        return [{"id": r[0], "task": r[1], "status": r[2], "created": r[3], "updated": r[4]} for r in rows]
 
     def get_workflow(self, workflow_id: str) -> dict | None:
         """获取单个工作流详情"""
         with self._conn() as conn:
-            row = conn.execute(
-                "SELECT * FROM workflows WHERE workflow_id=?", (workflow_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM workflows WHERE workflow_id=?", (workflow_id,)).fetchone()
             if not row:
                 return None
-            nodes = conn.execute(
-                "SELECT * FROM workflow_nodes WHERE workflow_id=?", (workflow_id,)
-            ).fetchall()
+            nodes = conn.execute("SELECT * FROM workflow_nodes WHERE workflow_id=?", (workflow_id,)).fetchall()
 
         return {
-            "id": row[0], "task": row[1], "status": row[2],
-            "created": row[3], "updated": row[4],
+            "id": row[0],
+            "task": row[1],
+            "status": row[2],
+            "created": row[3],
+            "updated": row[4],
             "dag": json.loads(row[5]) if row[5] else {},
-            "nodes": [
-                {"id": n[1], "type": n[2], "status": n[5], "output": n[6]}
-                for n in nodes
-            ]
+            "nodes": [{"id": n[1], "type": n[2], "status": n[5], "output": n[6]} for n in nodes],
         }

@@ -19,8 +19,9 @@ from pathlib import Path
 
 try:
     from importlib.metadata import version as _pkg_version
+
     _VERSION = _pkg_version("metaos")
-except Exception:  # noqa: BLE001
+except Exception:
     _VERSION = "0.0.0"
 from typing import Any
 
@@ -285,7 +286,7 @@ def handle_status(sess, params):
         total = len(entries)
         has = sum(1 for e in entries if e["ssot"])
         ssot = f"{round(has / total * 100, 1)}% ({has}/{total})"
-    except Exception:  # defensive fallback  # noqa: BLE001
+    except Exception:  # defensive fallback
         ssot = "?"
     return {
         "backend": engine.m.backend_name,
@@ -360,7 +361,7 @@ def handle_ssot(sess, params):
             "coverage_pct": round(has / total * 100, 1) if total else 0,
             "missing": missing[:20] if params.get("verbose") else [],
         }
-    except Exception as e:  # defensive fallback  # noqa: BLE001
+    except Exception as e:  # defensive fallback
         return {"error": str(e)}
 
 
@@ -421,7 +422,7 @@ def handle_request(msg: dict) -> dict | None:
             return jsonrpc_result(
                 {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False, indent=2)}]}, msg_id
             )
-        except Exception as e:  # defensive fallback  # noqa: BLE001
+        except Exception as e:  # defensive fallback
             return jsonrpc_error(-32603, f"执行失败: {e}", msg_id)
 
     elif method == "resources/list":
@@ -478,8 +479,7 @@ def main():
     logger = logging.getLogger("metaos.mcp")
     logger.info("MetaOS MCP 服务器启动 (多 session 隔离)")
     logger.warning(
-        "!! 此独立入口已弃用 (deprecated ADR-0181 Phase 2) !! "
-        "请使用 bos://ecos/workflow 与 bos://governance/metaos/*"
+        "!! 此独立入口已弃用 (deprecated ADR-0181 Phase 2) !! 请使用 bos://ecos/workflow 与 bos://governance/metaos/*"
     )
     if os.environ.get("METAOS_MCP_ALLOW_STANDALONE", "0").strip() != "1":
         logger.error(

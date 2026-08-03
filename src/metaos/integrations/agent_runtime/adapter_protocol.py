@@ -16,8 +16,8 @@ from .provider_context import ProviderLaunchContext
 class ProviderAdapter(Protocol):
     provider_name: str
 
-    def project(self, session: AgentSession, target_dir: Path) -> ProviderLaunchContext:
+    def project(self, session: AgentSession, target_dir: Path) -> ProviderLaunchContext:  # type: ignore[reportReturnType]
         """Create provider-readable projections for an already-prepared session."""
 
-    def launch_command(self, context: ProviderLaunchContext, extra_args: list[str] | None = None) -> list[str]:
+    def launch_command(self, context: ProviderLaunchContext, extra_args: list[str] | None = None) -> list[str]:  # type: ignore[reportReturnType]
         """Return a command without executing it."""

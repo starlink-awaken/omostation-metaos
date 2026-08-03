@@ -55,14 +55,14 @@ class DecisionGate:
         for kw in self.red_keywords:
             # \b 不匹配 CJK 字符，使用逐字精确匹配替代
             if kw.lower() in input_lower:
-                return (DecisionLevel.RED, f"触发了红线关键词: {kw}", None)
+                return (DecisionLevel.RED, f"触发了红线关键词: {kw}", None)  # type: ignore[reportReturnType]
 
         for kw in self.yellow_keywords:
             if kw.lower() in input_lower:
                 deadline = datetime.now() + timedelta(hours=self.yellow_deadline_hours)
                 return (DecisionLevel.YELLOW, f"需事后确认: {kw}", deadline)
 
-        return (DecisionLevel.GREEN, "default_green", None)
+        return (DecisionLevel.GREEN, "default_green", None)  # type: ignore[reportReturnType]
 
     def check_red_list_modification(self, operation: str) -> bool:
         """检查是否试图修改红灯区清单（只增不减）"""

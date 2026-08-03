@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from metaos_agentkit.task_creation import create_task
+from metaos_agentkit.task_creation import create_task  # type: ignore[reportMissingImports]
 
 
 def test_high_risk_commit_requires_target_binding(tmp_path: Path) -> None:

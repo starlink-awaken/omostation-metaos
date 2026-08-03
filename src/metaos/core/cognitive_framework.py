@@ -93,7 +93,7 @@ class CognitiveFrameworkLoader:
                     fw = yaml.safe_load(f)
                     if fw and _is_cognitive_framework(fw):
                         self.frameworks.append(fw)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 logger.warning("Failed to load cognitive framework %s: %s", filepath, e)
 
     def get_applicable_frameworks(self, task_context: str) -> list[dict]:

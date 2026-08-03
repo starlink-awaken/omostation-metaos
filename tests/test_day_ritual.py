@@ -5,11 +5,7 @@ Tests the non-interactive logic: state management, recovery path, and
 day-step structure without requiring user input.
 """
 
-import json
-from pathlib import Path
 from unittest import mock
-
-import pytest
 
 from metaos.onboard import (
     _detect_interrupt,
@@ -84,8 +80,9 @@ class TestDayStructure:
 
     def test_all_7_days_defined(self):
         """The onboard run() function handles days 1 through 7."""
-        import metaos.onboard as onboard
         import inspect
+
+        import metaos.onboard as onboard
 
         source = inspect.getsource(onboard.run)
         for day in range(1, 8):
@@ -93,8 +90,9 @@ class TestDayStructure:
 
     def test_day1_has_morning_and_evening(self):
         """Day 1 includes both morning ritual and evening integration."""
-        import metaos.onboard as onboard
         import inspect
+
+        import metaos.onboard as onboard
 
         source = inspect.getsource(onboard.run)
         # Find day 1 block
@@ -106,8 +104,9 @@ class TestDayStructure:
 
     def test_day7_has_closing_ritual(self):
         """Day 7 includes the closing ceremony."""
-        import metaos.onboard as onboard
         import inspect
+
+        import metaos.onboard as onboard
 
         source = inspect.getsource(onboard.run)
         day7_start = source.index("day == 7")
@@ -117,8 +116,9 @@ class TestDayStructure:
 
     def test_day2_has_review(self):
         """Day 2 includes micro-review (cli.review)."""
-        import metaos.onboard as onboard
         import inspect
+
+        import metaos.onboard as onboard
 
         source = inspect.getsource(onboard.run)
         day2_start = source.index("day == 2")
@@ -128,8 +128,9 @@ class TestDayStructure:
 
     def test_day3_has_gate(self):
         """Day 3 includes decision gate (cli.gate)."""
-        import metaos.onboard as onboard
         import inspect
+
+        import metaos.onboard as onboard
 
         source = inspect.getsource(onboard.run)
         day3_start = source.index("day == 3")

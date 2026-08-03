@@ -79,28 +79,28 @@ def _mcp_tool_allowed(tool_name: str, allowed: dict[str, list[str]]) -> tuple[bo
 
 def evaluate(payload: dict[str, Any], env: dict[str, str] | None = None) -> dict[str, Any]:
     """Evaluate one Claude PreToolUse payload without provider dependencies."""
-    env = env or os.environ
+    env = env or os.environ  # type: ignore[reportAssignmentType]
     tool_name = str(payload.get("tool_name", ""))
     tool_input = payload.get("tool_input") or {}
     try:
-        policy = json.loads(env.get("METAOS_CAPABILITY_POLICY_JSON", "{}"))
+        policy = json.loads(env.get("METAOS_CAPABILITY_POLICY_JSON", "{}"))  # type: ignore[reportOptionalMemberAccess]
         allowed_mcp_tools = json.loads(
-            env.get("METAOS_ALLOWED_MCP_TOOLS_JSON", json.dumps(policy.get("allowed_mcp_tools", {})))
+            env.get("METAOS_ALLOWED_MCP_TOOLS_JSON", json.dumps(policy.get("allowed_mcp_tools", {})))  # type: ignore[reportOptionalMemberAccess]
         )
     except json.JSONDecodeError:
         return _deny("MetaOS capability policy is invalid; refusing the tool call.")
     if not isinstance(allowed_mcp_tools, dict) or not all(isinstance(value, list) for value in allowed_mcp_tools.values()):
         return _deny("MetaOS MCP tool policy is invalid; refusing the tool call.")
 
-    workspace_raw = env.get("METAOS_WORKSPACE_ROOT", "")
+    workspace_raw = env.get("METAOS_WORKSPACE_ROOT", "")  # type: ignore[reportOptionalMemberAccess]
     if not workspace_raw:
         return _deny("MetaOS workspace root is missing; refusing the tool call.")
     workspace = Path(workspace_raw).expanduser().resolve(strict=False)
-    mode = str(env.get("METAOS_MODE", policy.get("mode", "observe")))
-    gate = str(env.get("METAOS_GATE_DECISION", policy.get("gate_decision", "red")))
+    mode = str(env.get("METAOS_MODE", policy.get("mode", "observe")))  # type: ignore[reportOptionalMemberAccess]
+    gate = str(env.get("METAOS_GATE_DECISION", policy.get("gate_decision", "red")))  # type: ignore[reportOptionalMemberAccess]
     network = bool(policy.get("network", False))
     profile_name = str(policy.get("name", "core"))
-    session_file = env.get("METAOS_AGENT_SESSION_FILE", "")
+    session_file = env.get("METAOS_AGENT_SESSION_FILE", "")  # type: ignore[reportOptionalMemberAccess]
     if not session_file or not Path(session_file).exists():
         return _deny("MetaOS running-session projection is missing; refusing the tool call.")
 

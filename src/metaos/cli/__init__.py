@@ -95,7 +95,7 @@ class CLI:
             try:
                 self.engine.d.save_principle(p)
                 print(f"\n📌 经验教训已自动存入 D_私有（原则 ID: {p.principle_id[:8]}）")
-            except Exception:  # defensive fallback  # noqa: BLE001
+            except Exception:  # defensive fallback
                 pass  # 存失败不阻塞主流程
 
         return result
@@ -246,6 +246,7 @@ def main(argv: list[str] | None = None) -> int:
         cli.gate(args.decision)
     elif args.command == "admit":
         from metaos.layers.admission_gateway import AdmissionGateway
+
         gateway = AdmissionGateway()
         req = {
             "domain": args.domain,
@@ -253,20 +254,21 @@ def main(argv: list[str] | None = None) -> int:
             "declared_values": args.values.split(",") if args.values else [],
             "supports_otlp": args.otlp,
             "omo_audit_trail_id": args.audit_id,
-            "capabilities": args.capabilities.split(",") if args.capabilities else []
+            "capabilities": args.capabilities.split(",") if args.capabilities else [],
         }
         result = gateway.evaluate_admission(req)
         if result["status"] == "admitted":
             print(f"✅ 准入通过 (Admitted): {result['reasons'][0]}")
         else:
             print("❌ 准入拦截 (Rejected):")
-            for reason in result['reasons']:
+            for reason in result["reasons"]:
                 print(f"   - {reason}")
             sys.exit(1)
     elif args.command == "review":
         cli.review(args.action, args.expected, args.actual)
     elif args.command == "run":
         from metaos.core.workflow_parser import WorkflowParser
+
         try:
             # 系统级自动鉴权（Workflow 以 metaos_system 身份运行）
             token = engine.register_h("metaos_system", "MetaOS Workflow Runner")
@@ -275,7 +277,7 @@ def main(argv: list[str] | None = None) -> int:
             parser_engine = WorkflowParser(engine)
             wf = parser_engine.parse_file(args.file)
             print(f"\n🚀 启动工作流: {wf.workflow_id} ({len(wf.nodes)} 节点)")
-            wf.run()
+            wf.run()  # type: ignore[reportUnusedCoroutine]
 
             print("\n🏁 工作流执行报告:")
             for nid, node in wf.nodes.items():
@@ -283,10 +285,11 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  {icon} [{nid}] {node.status}")
                 if node.output:
                     print(f"       → {node.output[:120]}...")
-        except Exception as e:  # defensive fallback  # noqa: BLE001
+        except Exception as e:  # defensive fallback
             print(f"❌ 工作流执行失败: {e}")
     elif args.command == "plan":
         from metaos.core.workflow_planner import WorkflowPlanner
+
         try:
             token = engine.register_h("metaos_system", "MetaOS Planner")
             engine.authenticate(token)
@@ -299,20 +302,20 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{'─' * 50}")
             for i, (nid, node) in enumerate(wf.nodes.items()):
                 deps = " ← " + ", ".join(node.depends_on) if node.depends_on else ""
-                print(f"  {i+1}. [{node.task_type}] {nid}{deps}")
+                print(f"  {i + 1}. [{node.task_type}] {nid}{deps}")
                 print(f"     {node.input_prompt[:80]}...")
 
             if args.dry_run:
                 print("\n⏸  --dry-run 模式: 规划已生成，跳过执行")
-                if getattr(args, 'save', None):
+                if getattr(args, "save", None):
                     _save_workflow_yaml(wf, planner._last_dag, args.save)
                 return 0
 
-            if getattr(args, 'save', None):
+            if getattr(args, "save", None):
                 _save_workflow_yaml(wf, planner._last_dag, args.save)
 
             print(f"\n⚙️  开始执行 {len(wf.nodes)} 个节点...")
-            wf.run()
+            wf.run()  # type: ignore[reportUnusedCoroutine]
 
             print("\n🏁 工作流执行报告:")
             for nid, node in wf.nodes.items():
@@ -322,12 +325,14 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"       → {node.output[:150]}...")
                 elif node.status == "awaiting_approval":
                     print(f"       ⚠️  需人工审批: metaos approve {wf.workflow_id}")
-        except Exception as e:  # defensive fallback  # noqa: BLE001
+        except Exception as e:  # defensive fallback
             print(f"❌ 动态规划失败: {e}")
             import traceback
+
             traceback.print_exc()
     elif args.command == "history":
         from metaos.core.workflow_store import WorkflowStore
+
         store = WorkflowStore()
         if args.id:
             wf_detail = store.get_workflow(args.id)
@@ -349,7 +354,7 @@ def main(argv: list[str] | None = None) -> int:
                 print("📋 暂无工作流历史记录")
             else:
                 print(f"\n📋 工作流执行历史 (最近 {len(records)} 条):")
-                print(f"{'─'*60}")
+                print(f"{'─' * 60}")
                 for r in records:
                     icon = "✅" if r["status"] == "completed" else "⏳" if r["status"] == "running" else "❌"
                     print(f"  {icon} {r['id']}")
@@ -358,6 +363,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "approve":
         # Gap #2: 批准被 RED 门控暂停的工作流
         from metaos.core.workflow_store import WorkflowStore
+
         store = WorkflowStore()
         wf_detail = store.get_workflow(args.workflow_id)
         if not wf_detail:

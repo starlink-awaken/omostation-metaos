@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from metaos_agentkit.service import create_task, install_global, install_local, status, uninstall_global
+from metaos_agentkit.service import create_task, install_global, install_local, status, uninstall_global  # type: ignore[reportMissingImports]
 
 
 def test_global_init_preserves_existing_content_and_is_idempotent(tmp_path: Path) -> None:
@@ -109,7 +109,7 @@ def test_status_reports_owned_state_without_claiming_core_ownership(tmp_path: Pa
 
 
 def test_launch_preview_does_not_gate_or_forward_adapter_options(tmp_path: Path, capsys) -> None:
-    from metaos_agentkit.cli import main
+    from metaos_agentkit.cli import main  # type: ignore[reportMissingImports]
 
     project = tmp_path / "project"
     project.mkdir()

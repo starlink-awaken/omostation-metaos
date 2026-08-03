@@ -105,7 +105,7 @@ class MetaGovernance:
         return {
             "status": "cooling",
             "proposal_id": prop.proposal_id,
-            "cooling_end": prop.cooling_end.isoformat(),
+            "cooling_end": prop.cooling_end.isoformat(),  # type: ignore[reportOptionalMemberAccess]
             "impact_scan": prop.impact_scan,
         }
 
@@ -152,8 +152,8 @@ class MetaGovernance:
         prop = self._proposals.get(proposal_id)
         if not prop:
             return {"status": "error", "message": "提案不存在"}
-        if datetime.now() < prop.cooling_end:
-            remaining = (prop.cooling_end - datetime.now()).seconds // 60
+        if datetime.now() < prop.cooling_end:  # type: ignore[reportOperatorIssue]
+            remaining = (prop.cooling_end - datetime.now()).seconds // 60  # type: ignore[reportOptionalOperand]
             return {"status": "cooling", "message": f"冷静期还剩 {remaining} 分钟"}
 
         # 执行前备份当前值（自动回滚用）
@@ -182,7 +182,7 @@ class MetaGovernance:
         if self._on_rule_changed:
             try:
                 self._on_rule_changed(prop.rule_id)
-            except Exception as e:  # defensive fallback  # noqa: BLE001
+            except Exception as e:  # defensive fallback
                 return {"status": "warning", "message": f"规则已批准但生效失败: {e}"}
 
         return {
@@ -214,7 +214,7 @@ class MetaGovernance:
                 if self._on_rule_changed:
                     try:
                         self._on_rule_changed(backup["rule_id"])
-                    except Exception:  # defensive fallback  # noqa: BLE001
+                    except Exception:  # defensive fallback
                         pass
                 return {
                     "status": "rolled_back",
@@ -246,7 +246,7 @@ class MetaGovernance:
                 prop = RuleChangeProposal(**pdata)
                 self._proposals[pid] = prop
             self._change_log = state.get("change_log", [])
-        except Exception:  # defensive fallback  # noqa: BLE001
+        except Exception:  # defensive fallback
             pass  # 首次启动无数据
 
     def _persist(self):

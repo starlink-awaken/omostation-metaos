@@ -32,14 +32,11 @@ def _load_templates():
     try:
         with open(template_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
-            return (
-                data.get("task_patterns", []),
-                data.get("default_template", []),
-                data.get("system_prompt", "")
-            )
-    except Exception as e:  # defensive fallback  # noqa: BLE001
+            return (data.get("task_patterns", []), data.get("default_template", []), data.get("system_prompt", ""))
+    except Exception as e:  # defensive fallback
         logger.error(f"Failed to load planner templates: {e}")
         return [], [], ""
+
 
 TASK_PATTERNS, DEFAULT_TEMPLATE, PLANNER_SYSTEM_PROMPT = _load_templates()
 
@@ -87,6 +84,7 @@ class WorkflowPlanner:
         """尝试使用 Ollama LLM 生成 DAG"""
         try:
             import requests
+
             # 优先选择支持 chat 的模型（跳过 gemma4，它不支持）
             preferred_models = ["qwen3.5:4b", "qwen3.5:9b", "fredrezones55/Qwopus3.5:9b"]
             model = self._pick_working_model(preferred_models)
@@ -135,7 +133,7 @@ class WorkflowPlanner:
 
             return result
 
-        except Exception as e:  # defensive fallback  # noqa: BLE001
+        except Exception as e:  # defensive fallback
             logger.warning(f"LLM planning failed: {e}")
             return None
 
@@ -143,6 +141,7 @@ class WorkflowPlanner:
         """选出一个实际可用（支持 chat）的 Ollama 模型"""
         try:
             import requests
+
             r = requests.get("http://localhost:11434/api/tags", timeout=5)
             available = {m["name"] for m in r.json().get("models", [])}
             for c in candidates:
@@ -151,12 +150,17 @@ class WorkflowPlanner:
                         # 快速验证 chat 接口
                         test = requests.post(
                             "http://localhost:11434/v1/chat/completions",
-                            json={"model": a, "messages": [{"role": "user", "content": "hi"}], "max_tokens": 5, "stream": False},
+                            json={
+                                "model": a,
+                                "messages": [{"role": "user", "content": "hi"}],
+                                "max_tokens": 5,
+                                "stream": False,
+                            },
                             timeout=30,
                         )
                         if test.status_code == 200:
                             return a
-        except Exception:  # defensive fallback  # noqa: BLE001
+        except Exception:  # defensive fallback
             pass
         return None
 
@@ -212,10 +216,7 @@ class WorkflowPlanner:
                 }
 
         # 完全无法匹配，使用兜底模板
-        nodes = [
-            {**n, "prompt": n["prompt"].format(task=task)}
-            for n in DEFAULT_TEMPLATE
-        ]
+        nodes = [{**n, "prompt": n["prompt"].format(task=task)} for n in DEFAULT_TEMPLATE]
         return {
             "workflow_id": "generic_task",
             "name": task[:50],

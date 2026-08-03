@@ -19,7 +19,7 @@ class _GreenGate:
 
 def test_canonical_asset_overrides_tampered_projection(tmp_path: Path) -> None:
     engine = SEngine(data_dir=str(tmp_path / "data"))
-    engine.gate = _GreenGate()
+    engine.gate = _GreenGate()  # type: ignore[reportAttributeAccessIssue]
     runtime = AgentRuntimeService(engine)
     session = AgentSession(
         provider=ProviderKind.CODEX,
@@ -45,13 +45,17 @@ def test_canonical_asset_overrides_tampered_projection(tmp_path: Path) -> None:
 
 def test_canonical_loader_rejects_cross_session_asset_substitution(tmp_path: Path) -> None:
     engine = SEngine(data_dir=str(tmp_path / "data"))
-    engine.gate = _GreenGate()
+    engine.gate = _GreenGate()  # type: ignore[reportAttributeAccessIssue]
     runtime = AgentRuntimeService(engine)
     first, _ = runtime.prepare(
-        AgentSession(provider=ProviderKind.CODEX, description="first", risk=OperationalRisk.R2, mode=ExecutionMode.STAGE)
+        AgentSession(
+            provider=ProviderKind.CODEX, description="first", risk=OperationalRisk.R2, mode=ExecutionMode.STAGE
+        )
     )
     second, _ = runtime.prepare(
-        AgentSession(provider=ProviderKind.CODEX, description="second", risk=OperationalRisk.R2, mode=ExecutionMode.STAGE)
+        AgentSession(
+            provider=ProviderKind.CODEX, description="second", risk=OperationalRisk.R2, mode=ExecutionMode.STAGE
+        )
     )
 
     substituted = replace(first, asset_id=second.asset_id)

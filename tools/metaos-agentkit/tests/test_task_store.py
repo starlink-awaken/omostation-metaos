@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from metaos_agentkit.task_store import (
+from metaos_agentkit.task_store import (  # type: ignore[reportMissingImports]
     archive_task,
     cleanup_terminal_tasks,
     list_task_records,

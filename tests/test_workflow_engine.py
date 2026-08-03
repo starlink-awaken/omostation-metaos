@@ -13,6 +13,7 @@ from metaos.core.workflow_planner import WorkflowPlanner
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def mock_engine():
     """A fully mocked SEngine that auto-authenticates and returns success."""
@@ -33,6 +34,7 @@ def simple_workflow(mock_engine):
 
 # ─── WorkflowNode Tests ──────────────────────────────────────────────────────
 
+
 class TestWorkflowNode:
     def test_default_status_is_pending(self):
         node = WorkflowNode(node_id="n1", task_type="reasoning", input_prompt="hello")
@@ -49,6 +51,7 @@ class TestWorkflowNode:
 
 # ─── Workflow Execution Tests ─────────────────────────────────────────────────
 
+
 class TestWorkflow:
     def test_add_node(self, mock_engine):
         wf = Workflow(workflow_id="wf1", engine=mock_engine)
@@ -58,7 +61,7 @@ class TestWorkflow:
     @pytest.mark.asyncio
     async def test_run_sequential_dag(self, simple_workflow, mock_engine):
         """Steps execute in topological order."""
-        with patch.object(simple_workflow, '_publish_event'):
+        with patch.object(simple_workflow, "_publish_event"):
             await simple_workflow.run()
 
         assert simple_workflow.nodes["step1"].status == "completed"
@@ -69,13 +72,14 @@ class TestWorkflow:
     async def test_dependency_respected(self, simple_workflow, mock_engine):
         """step2 should only run after step1 is done."""
         call_order = []
+
         def track_call(task):
             # task_id format: "{workflow_id}_{node_id}"
             call_order.append(task.task_id.split("_")[-1])  # last segment = node_id
             return {"status": "completed", "output": "done"}
 
         mock_engine.process.side_effect = track_call
-        with patch.object(simple_workflow, '_publish_event'):
+        with patch.object(simple_workflow, "_publish_event"):
             await simple_workflow.run()
 
         assert call_order == ["step1", "step2"]
@@ -88,7 +92,7 @@ class TestWorkflow:
         wf.add_node(WorkflowNode(node_id="n1", task_type="reasoning", input_prompt="fail me"))
         wf.add_node(WorkflowNode(node_id="n2", task_type="reasoning", input_prompt="never run", depends_on=["n1"]))
 
-        with patch.object(wf, '_publish_event'):
+        with patch.object(wf, "_publish_event"):
             await wf.run()
 
         assert wf.nodes["n1"].status == "failed"
@@ -102,8 +106,8 @@ class TestWorkflow:
         wf.add_node(WorkflowNode(node_id="n1", task_type="reasoning", input_prompt="risky"))
         wf.add_node(WorkflowNode(node_id="n2", task_type="reasoning", input_prompt="never", depends_on=["n1"]))
 
-        with patch.object(wf, '_publish_event'):
-            with patch.object(wf, '_publish_human_approval_event'):
+        with patch.object(wf, "_publish_event"):
+            with patch.object(wf, "_publish_human_approval_event"):
                 await wf.run()
 
         assert wf.nodes["n1"].status == "awaiting_approval"  # human-in-the-loop, not failed
@@ -116,8 +120,8 @@ class TestWorkflow:
         wf.add_node(WorkflowNode(node_id="n1", task_type="reasoning", input_prompt="step 1"))
         wf.add_node(WorkflowNode(node_id="n2", task_type="reasoning", input_prompt="step 2", depends_on=["n1"]))
 
-        with patch.object(wf, '_publish_event'):
-            with patch.object(wf, '_publish_human_approval_event'):
+        with patch.object(wf, "_publish_event"):
+            with patch.object(wf, "_publish_human_approval_event"):
                 await wf.run()
 
         # The second call's input should contain upstream output
@@ -127,6 +131,7 @@ class TestWorkflow:
 
 # ─── WorkflowParser Tests ────────────────────────────────────────────────────
 
+
 class TestWorkflowParser:
     def test_parse_valid_dict(self, mock_engine):
         parser = WorkflowParser(mock_engine)
@@ -135,7 +140,7 @@ class TestWorkflowParser:
             "nodes": [
                 {"id": "n1", "type": "research", "prompt": "do stuff"},
                 {"id": "n2", "type": "reasoning", "prompt": "think", "depends_on": ["n1"]},
-            ]
+            ],
         }
         wf = parser.parse_dict(data)
         assert wf.workflow_id == "test"
@@ -156,25 +161,24 @@ class TestWorkflowParser:
     def test_unknown_dependency_raises(self, mock_engine):
         parser = WorkflowParser(mock_engine)
         with pytest.raises(ValueError, match="unknown node"):
-            parser.parse_dict({
-                "workflow_id": "x",
-                "nodes": [{"id": "n1", "type": "reasoning", "prompt": "hi", "depends_on": ["ghost"]}]
-            })
+            parser.parse_dict(
+                {
+                    "workflow_id": "x",
+                    "nodes": [{"id": "n1", "type": "reasoning", "prompt": "hi", "depends_on": ["ghost"]}],
+                }
+            )
 
     def test_self_dependency_raises(self, mock_engine):
         parser = WorkflowParser(mock_engine)
         with pytest.raises(ValueError, match="self-dependency"):
-            parser.parse_dict({
-                "workflow_id": "x",
-                "nodes": [{"id": "n1", "type": "reasoning", "prompt": "hi", "depends_on": ["n1"]}]
-            })
+            parser.parse_dict(
+                {"workflow_id": "x", "nodes": [{"id": "n1", "type": "reasoning", "prompt": "hi", "depends_on": ["n1"]}]}
+            )
 
     def test_parse_file(self, mock_engine, tmp_path):
         import yaml
-        data = {
-            "workflow_id": "file_test",
-            "nodes": [{"id": "step1", "type": "reasoning", "prompt": "hello"}]
-        }
+
+        data = {"workflow_id": "file_test", "nodes": [{"id": "step1", "type": "reasoning", "prompt": "hello"}]}
         f = tmp_path / "wf.yaml"
         f.write_text(yaml.dump(data))
 
@@ -189,6 +193,7 @@ class TestWorkflowParser:
 
 
 # ─── WorkflowPlanner Tests ───────────────────────────────────────────────────
+
 
 class TestWorkflowPlanner:
     def test_heuristic_research_task(self, mock_engine):
@@ -229,7 +234,7 @@ class TestWorkflowPlanner:
     def test_llm_failure_falls_back_to_heuristic(self, mock_engine):
         """If LLM call fails, heuristic is used instead."""
         planner = WorkflowPlanner(mock_engine, use_llm=True)
-        with patch.object(planner, '_plan_with_llm', return_value=None):
+        with patch.object(planner, "_plan_with_llm", return_value=None):
             wf = planner.plan("研究某个话题")
         assert len(wf.nodes) >= 2
 
@@ -242,9 +247,9 @@ class TestWorkflowPlanner:
             "nodes": [
                 {"id": "step1", "type": "research", "prompt": "collect info"},
                 {"id": "step2", "type": "reasoning", "prompt": "analyze", "depends_on": ["step1"]},
-            ]
+            ],
         }
-        with patch.object(planner, '_plan_with_llm', return_value=llm_dag):
+        with patch.object(planner, "_plan_with_llm", return_value=llm_dag):
             wf = planner.plan("some task")
         assert wf.workflow_id == "llm_generated"
         assert len(wf.nodes) == 2
@@ -260,4 +265,4 @@ class TestWorkflowPlanner:
         planner = WorkflowPlanner(mock_engine)
         text = '```json\n{"workflow_id": "y", "nodes": []}\n```'
         result = planner._extract_json(text)
-        assert result["workflow_id"] == "y"
+        assert result["workflow_id"] == "y"  # type: ignore[reportOptionalSubscript]

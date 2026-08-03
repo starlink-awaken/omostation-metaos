@@ -10,7 +10,7 @@ import pytest
 
 from metaos.cli import CLI
 from metaos.core.engine import SEngine
-from metaos.core.types import Task, TaskType
+from metaos.core.types import TaskType
 
 
 @pytest.fixture

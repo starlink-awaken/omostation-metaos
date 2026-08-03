@@ -253,7 +253,7 @@ class DeadlockDetector:
                 },
                 timeout=1.0,
             )
-        except Exception as e:  # defensive fallback  # noqa: BLE001
+        except Exception as e:  # defensive fallback
             _log.warning("Failed to anchor deadlock resolution to L0 SSB", exc_info=e)
 
         return resolution

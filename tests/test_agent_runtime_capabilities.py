@@ -6,7 +6,6 @@ from metaos.core.engine import SEngine
 from metaos.core.types import DecisionLevel
 from metaos.integrations.agent_runtime.capabilities import (
     requested_mcp_servers,
-    resolve_profile,
     validate_capability_profile,
 )
 from metaos.integrations.agent_runtime.contracts import (
@@ -116,7 +115,7 @@ def test_provider_context_carries_resolved_policy_without_granting_unrequested_m
 
 def test_invalid_profile_is_blocked_before_gate_execution(tmp_path: Path) -> None:
     engine = SEngine(data_dir=str(tmp_path / "data"))
-    engine.gate = _GreenGate()
+    engine.gate = _GreenGate()  # type: ignore[reportAttributeAccessIssue]
     runtime = AgentRuntimeService(engine)
     session = _session(risk=OperationalRisk.R1, mode=ExecutionMode.OBSERVE, profile="does-not-exist")
 

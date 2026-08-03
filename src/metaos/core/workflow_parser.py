@@ -9,6 +9,7 @@ from metaos.core.workflow import Workflow, WorkflowNode
 
 logger = logging.getLogger("metaos.workflow_parser")
 
+
 class WorkflowParser:
     """Parses a YAML definition into an executable MetaOS Workflow."""
 
@@ -46,12 +47,7 @@ class WorkflowParser:
             prompt = n.get("prompt", "")
             depends_on = n.get("depends_on", [])
 
-            node = WorkflowNode(
-                node_id=node_id,
-                task_type=task_type,
-                input_prompt=prompt,
-                depends_on=depends_on
-            )
+            node = WorkflowNode(node_id=node_id, task_type=task_type, input_prompt=prompt, depends_on=depends_on)
             workflow.add_node(node)
 
         # 校验环依赖等图结构（TODO: 暂时简单实现）

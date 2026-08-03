@@ -116,15 +116,18 @@ class TaskManager:
         """
         try:
             from metaos.audit import audit_log
+
             log = audit_log(self._storage_path_obj().parent / "audit", "a2a-task")
-            log.append({
-                "ts": self._ts(),
-                "task_id": task.id,
-                "service": task.service_name,
-                "tool": task.tool_name,
-                "status": task.status,
-                "event": event,
-            })
+            log.append(
+                {
+                    "ts": self._ts(),
+                    "task_id": task.id,
+                    "service": task.service_name,
+                    "tool": task.tool_name,
+                    "status": task.status,
+                    "event": event,
+                }
+            )
         except Exception:  # defensive fallback
             # 审计失败不影响主流程
             pass

@@ -89,7 +89,7 @@ def run_scenario():
 
     # ── 领域5：版本化策略 ──
     print("\n[领域5] 数据版本化")
-    from core.types import Principle
+    from core.types import Principle  # type: ignore[reportMissingImports]
 
     p1 = Principle(principle_id="P_TEST", content="测试原则 v1", status="active")
     engine.d.save_principle(p1)

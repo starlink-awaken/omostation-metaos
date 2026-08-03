@@ -1,4 +1,5 @@
 """ADR-0252 O-D4: admit observe vs blocking."""
+
 from __future__ import annotations
 
 from metaos.layers.admission_gateway import AdmissionGateway

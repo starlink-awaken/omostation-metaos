@@ -130,7 +130,7 @@ class CommunityEngine:
     def propose_shared_asset(self, proposer: str, title: str, content: str, vote_hours: int = 72) -> Proposal:
         """提交一条 D_共有 资产提案"""
         if proposer not in self._registered_h:
-            return {"status": "error", "message": "提案者未注册"}
+            return {"status": "error", "message": "提案者未注册"}  # type: ignore[reportReturnType]
 
         prop = Proposal(
             title=title,
@@ -180,11 +180,11 @@ class CommunityEngine:
                             "proposer_h": prop.proposer_h,
                         }
                     )
-                except Exception:  # defensive fallback  # noqa: BLE001
+                except Exception:  # defensive fallback
                     pass
         elif prop.votes_against >= required:
             prop.status = ProposalStatus.REJECTED
-        elif datetime.now() > prop.expires_at:
+        elif datetime.now() > prop.expires_at:  # type: ignore[reportOperatorIssue]
             prop.status = ProposalStatus.EXPIRED
 
         return {
@@ -209,7 +209,7 @@ class CommunityEngine:
                     "status": p.status.value,
                     "for": p.votes_for,
                     "against": p.votes_against,
-                    "deadline": p.expires_at.isoformat(),
+                    "deadline": p.expires_at.isoformat(),  # type: ignore[reportOptionalMemberAccess]
                 }
             )
         return sorted(result, key=lambda x: x.get("deadline", ""))
@@ -253,7 +253,7 @@ class CommunityEngine:
                         "arbiter_h_id": conflict.arbiter_h_id,
                     }
                 )
-            except Exception:  # defensive fallback  # noqa: BLE001
+            except Exception:  # defensive fallback
                 pass
         return {
             "status": "ok",

@@ -41,6 +41,7 @@ class fcntl_lock:
 
     def __enter__(self) -> "fcntl_lock":
         import fcntl  # POSIX-only; 延迟 import
+
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         self._fd = os.open(str(self.lock_path), os.O_CREAT | os.O_RDWR, 0o644)
         fcntl.flock(self._fd, fcntl.LOCK_EX)
@@ -49,6 +50,7 @@ class fcntl_lock:
     def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
         if self._fd is not None:
             import fcntl
+
             try:
                 fcntl.flock(self._fd, fcntl.LOCK_UN)
             finally:
@@ -83,7 +85,7 @@ class AppendOnlyLog:
             **json_kwargs: 透传给 json.dumps (e.g. sort_keys=True).
         """
         if hasattr(record, "model_dump") and callable(getattr(record, "model_dump", None)):
-            record = record.model_dump()
+            record = record.model_dump()  # type: ignore[reportAttributeAccessIssue]
 
         if schema is not None:
             schema.model_validate(record)
@@ -152,6 +154,7 @@ class AppendOnlyLog:
         """按 field 分组统计 record 数."""
         log = AppendOnlyLog(path) if path is not None else self
         from collections import defaultdict
+
         counter: dict[str, int] = defaultdict(int)
         for r in log.read_all():
             v = r.get(field, "<missing>")

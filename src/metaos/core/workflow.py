@@ -203,7 +203,7 @@ class Workflow:
             self._publish_event(node)
             return False
 
-        except Exception as e:  # defensive fallback  # noqa: BLE001
+        except Exception as e:  # defensive fallback
             node.output = f"Research subprocess failed: {e}"
             node.status = "failed"
             self._publish_event(node)
@@ -224,7 +224,7 @@ class Workflow:
             node.output = f"[超时] SEngine 超过 {node.timeout_seconds}s"
             self._publish_event(node)
             return False
-        except Exception as e:  # defensive fallback  # noqa: BLE001
+        except Exception as e:  # defensive fallback
             node.status = "failed"
             node.output = str(e)
             self._publish_event(node)
@@ -265,7 +265,7 @@ class Workflow:
                 node.status,
                 task_type=node.task_type,
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning("event publish failed for %s: %s", node.node_id, e)
 
     def _publish_human_approval_event(self, node: WorkflowNode):
@@ -279,5 +279,5 @@ class Workflow:
                 reason=node.output or "",
                 approve_cmd=f"metaos approve {self.workflow_id}",
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning("Failed to publish approval event: %s", e)

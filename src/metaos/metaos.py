@@ -112,14 +112,14 @@ def cmd_admit(args):
         "declared_values": args.values.split(",") if args.values else [],
         "supports_otlp": args.otlp,
         "omo_audit_trail_id": args.audit_id,
-        "capabilities": args.capabilities.split(",") if args.capabilities else []
+        "capabilities": args.capabilities.split(",") if args.capabilities else [],
     }
     result = gateway.evaluate_admission(req)
     if result["status"] == "admitted":
         print(f"✅ 准入通过 (Admitted): {result['reasons'][0]}")
     else:
         print("❌ 准入拦截 (Rejected):")
-        for reason in result['reasons']:
+        for reason in result["reasons"]:
             print(f"   - {reason}")
         sys.exit(1)
 
@@ -318,7 +318,7 @@ def cmd_interactive(args):
                     cli2.morning("今日最值得聚焦的认知点是？")
                     cli2.evening("今日最重要的认知收获是？")
                 print("完成")
-            except Exception as e:  # defensive fallback  # noqa: BLE001
+            except Exception as e:  # defensive fallback
                 print(f"错误: {e}")
         else:
             print(f"未知命令: {cmd}")

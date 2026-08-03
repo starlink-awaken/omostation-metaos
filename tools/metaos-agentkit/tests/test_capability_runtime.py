@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from metaos_agentkit.capability_runtime import render_claude_settings, render_codex_command
-from metaos_agentkit.claude_hook import evaluate
+from metaos_agentkit.capability_runtime import render_claude_settings, render_codex_command  # type: ignore[reportMissingImports]
+from metaos_agentkit.claude_hook import evaluate  # type: ignore[reportMissingImports]
 
 
 def _repo_stage_policy() -> dict:

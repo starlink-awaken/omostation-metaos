@@ -143,7 +143,7 @@ class AgentRuntimeService:
             recent = self.engine.d.get_decisions(self.engine.current_h.h_id, 10)
             principles = self.engine.d.get_principles()
             self.engine.immune.evaluate(self.engine.current_h.h_id, self._gate_input(session), recent, principles)
-        except Exception:  # defensive fallback  # noqa: BLE001
+        except Exception:  # defensive fallback
             pass
         return session
 
@@ -212,7 +212,7 @@ class AgentRuntimeService:
     def _trace(self, session: AgentSession, event: str, detail: str) -> None:
         try:
             self.engine.d.append_trace_log(session.asset_id or f"session-{session.session_id}", event, detail)
-        except Exception:  # defensive fallback  # noqa: BLE001
+        except Exception:  # defensive fallback
             pass
 
     @staticmethod

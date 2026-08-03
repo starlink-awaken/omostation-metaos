@@ -29,7 +29,7 @@ def _load_state() -> dict:
     if ONBOARD_FILE.exists():
         try:
             return json.loads(ONBOARD_FILE.read_text())
-        except Exception:  # defensive fallback  # noqa: BLE001
+        except Exception:  # defensive fallback
             pass
     return {"day": 0, "last_active": None, "completed": False}
 
@@ -173,7 +173,7 @@ def run():
                 print("\n⏸  已暂停。下次运行 metaos onboard 会从中断处继续")
                 break
 
-    state["completed"] = day >= 7
+    state["completed"] = day >= 7  # type: ignore[reportPossiblyUnboundVariable]
     _save_state(state)
     print(f"\n🧠 后端: {engine.m.backend_name}")
 

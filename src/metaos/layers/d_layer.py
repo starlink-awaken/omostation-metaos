@@ -128,7 +128,7 @@ class DLayer:
                 ),
             )
             conn.commit()
-        except Exception:  # defensive fallback  # noqa: BLE001
+        except Exception:  # defensive fallback
             conn.rollback()
             raise
         finally:
@@ -240,7 +240,7 @@ class DLayer:
                 ),
             )
             conn.commit()
-        except Exception:  # defensive fallback  # noqa: BLE001
+        except Exception:  # defensive fallback
             conn.rollback()
             raise
         finally:
@@ -305,14 +305,17 @@ class DLayer:
         # B-2 跨仓债 audit trail: append-only JSONL
         try:
             from metaos.audit import audit_log
+
             log = audit_log(self.data_dir / "audit", "d-layer-trace")
-            log.append({
-                "ts": datetime.now().isoformat() + "Z",
-                "asset_id": asset_id,
-                "event": event,
-                "detail": detail,
-            })
-        except Exception:  # defensive fallback  # noqa: BLE001
+            log.append(
+                {
+                    "ts": datetime.now().isoformat() + "Z",
+                    "asset_id": asset_id,
+                    "event": event,
+                    "detail": detail,
+                }
+            )
+        except Exception:  # defensive fallback
             # 审计失败不影响主流程
             pass
 
@@ -358,7 +361,7 @@ class DLayer:
                         "last_used": dt.fromisoformat(r[5]),
                     }
                 )
-            except Exception:  # defensive fallback  # noqa: BLE001
+            except Exception:  # defensive fallback
                 pass
         return result
 
@@ -439,13 +442,13 @@ class DLayer:
         conn = sqlite3.connect(str(self.db_path))
         try:
             rows = conn.execute("SELECT key, value FROM governance_state").fetchall()
-        except Exception:  # defensive fallback  # noqa: BLE001
+        except Exception:  # defensive fallback
             rows = []
         conn.close()
         result = {}
         for k, v in rows:
             try:
                 result[k] = json.loads(v)
-            except Exception:  # defensive fallback  # noqa: BLE001
+            except Exception:  # defensive fallback
                 result[k] = v
         return result

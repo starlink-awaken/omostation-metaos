@@ -44,8 +44,8 @@ def test_publish_event_uses_bus_foundation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """When bus-foundation is available, _publish_event must emit on the bus."""
-    from bus_foundation.backends.eventbus import EventBusBackend
     from bus_foundation import _backends
+    from bus_foundation.backends.eventbus import EventBusBackend
 
     be = EventBusBackend()
     received: list = []
@@ -59,7 +59,7 @@ def test_publish_event_uses_bus_foundation(
 
         wf = Workflow.__new__(Workflow)  # bypass __init__
         wf.workflow_id = "wf-test"
-        wf._publish_event(_FakeNode(status="completed", node_id="n1"))
+        wf._publish_event(_FakeNode(status="completed", node_id="n1"))  # type: ignore[reportArgumentType]
 
         assert _wait_for(lambda: len(received) >= 1)
         env = received[0]
@@ -74,8 +74,8 @@ def test_publish_human_approval_uses_bus_foundation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Human approval publishes metaos:node:awaiting_approval on the bus."""
-    from bus_foundation.backends.eventbus import EventBusBackend
     from bus_foundation import _backends
+    from bus_foundation.backends.eventbus import EventBusBackend
 
     be = EventBusBackend()
     received: list = []
@@ -89,8 +89,8 @@ def test_publish_human_approval_uses_bus_foundation(
         wf = Workflow.__new__(Workflow)
         wf.workflow_id = "wf-approval"
         node = _FakeNode(status="awaiting_approval", node_id="n2")
-        node.output = "needs review"
-        wf._publish_human_approval_event(node)
+        node.output = "needs review"  # type: ignore[reportAttributeAccessIssue]
+        wf._publish_human_approval_event(node)  # type: ignore[reportArgumentType]
 
         assert _wait_for(lambda: len(received) >= 1)
         env = received[0]
@@ -103,8 +103,8 @@ def test_legacy_env_flag_forces_http_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """METAOS_LEGACY_AGORA_HTTP=1 must force HTTP path even if bus is up."""
-    from bus_foundation.backends.eventbus import EventBusBackend
     from bus_foundation import _backends
+    from bus_foundation.backends.eventbus import EventBusBackend
 
     be = EventBusBackend()
     received: list = []
@@ -118,7 +118,7 @@ def test_legacy_env_flag_forces_http_fallback(
 
         wf = Workflow.__new__(Workflow)
         wf.workflow_id = "wf-legacy"
-        wf._publish_event(_FakeNode(status="completed", node_id="n3"))
+        wf._publish_event(_FakeNode(status="completed", node_id="n3"))  # type: ignore[reportArgumentType]
 
         # Bus should NOT have been called
         assert not _wait_for(lambda: len(received) >= 1, timeout=0.2)
@@ -143,7 +143,7 @@ def test_publish_event_survives_bus_foundation_missing(
 
             wf = Workflow.__new__(Workflow)
             wf.workflow_id = "wf-nobus"
-            wf._publish_event(_FakeNode(status="failed", node_id="n4"))
+            wf._publish_event(_FakeNode(status="failed", node_id="n4"))  # type: ignore[reportArgumentType]
             assert http_post.called
     finally:
         if saved is not None:
@@ -166,6 +166,6 @@ def test_publish_event_survives_publish_exception(
 
         wf = Workflow.__new__(Workflow)
         wf.workflow_id = "wf-boom"
-        wf._publish_event(_FakeNode(status="running", node_id="n5"))
+        wf._publish_event(_FakeNode(status="running", node_id="n5"))  # type: ignore[reportArgumentType]
         # Bus raised → HTTP fallback ran
         assert http_post.called

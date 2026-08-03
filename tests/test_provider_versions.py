@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 from metaos.integrations.agent_runtime.provider_versions import (
     _extract_version,
@@ -32,7 +31,7 @@ def test_probe_with_stub_path(tmp_path, monkeypatch):
     stub = tmp_path / "codex"
     stub.write_text("#!/bin/sh\necho 'codex 9.9.9'\n", encoding="utf-8")
     stub.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ.get('PATH','')}")
+    monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ.get('PATH', '')}")
     from metaos.integrations.agent_runtime import provider_versions as pv
 
     r = pv.probe_codex()

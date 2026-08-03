@@ -34,7 +34,7 @@ class _GreenGate:
 
 def _runtime(tmp_path: Path, gate=None) -> AgentRuntimeService:
     engine = SEngine(data_dir=str(tmp_path / "data"))
-    engine.gate = gate or _YellowGate()
+    engine.gate = gate or _YellowGate()  # type: ignore[reportAttributeAccessIssue]
     return AgentRuntimeService(engine)
 
 

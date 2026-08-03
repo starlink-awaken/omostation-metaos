@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 import pytest
-
 
 # ── 4a cognitive pack ──────────────────────────────────────────────
 
@@ -33,9 +31,9 @@ def test_prefer_bundled(monkeypatch):
 
 
 def test_sync_check_script():
-    from pathlib import Path
     import subprocess
     import sys
+    from pathlib import Path
 
     script = Path(__file__).resolve().parents[1] / "scripts" / "sync_cognitive_frameworks.py"
     proc = subprocess.run(
@@ -68,6 +66,7 @@ def test_publish_http_mode_mocked(monkeypatch):
 
     def fake_post(url, **kwargs):
         calls.append((url, kwargs))
+
         class R:
             status_code = 200
 
@@ -110,7 +109,6 @@ def test_canonical_load_rejects_tamper(tmp_path, monkeypatch):
     from metaos.core.engine import SEngine
     from metaos.integrations.agent_runtime.canonical import load_canonical_session
     from metaos.integrations.agent_runtime.contracts import AgentSession
-    from metaos.integrations.agent_runtime.integrity import attach_integrity
     from metaos.integrations.agent_runtime.service import AgentRuntimeService
 
     eng = SEngine(data_dir=str(tmp_path / "data"))

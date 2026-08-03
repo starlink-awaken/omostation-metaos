@@ -42,7 +42,7 @@ def _run_version(argv: list[str], timeout: float = 3.0) -> tuple[bool, str, str]
         return False, "", "not_found"
     except subprocess.TimeoutExpired:
         return False, "", "timeout"
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return False, "", f"error:{e}"
     out = (proc.stdout or "") + (proc.stderr or "")
     return proc.returncode == 0 or bool(out.strip()), out.strip(), f"exit={proc.returncode}"

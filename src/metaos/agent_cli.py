@@ -86,7 +86,9 @@ def _canonical_context(engine: SEngine, submitted: AgentSession) -> tuple[AgentS
     return session, prepare_payload(session, context)
 
 
-def _require_high_risk_confirmation(runtime: AgentRuntimeService, session: AgentSession, access_level: str) -> AgentSession:
+def _require_high_risk_confirmation(
+    runtime: AgentRuntimeService, session: AgentSession, access_level: str
+) -> AgentSession:
     """Elevate every R3/R4 commit to a target-bound confirmation checkpoint.
 
     A green dynamic Gate means no additional blocker was found. It does not
@@ -147,7 +149,9 @@ def _read_evidence_bundle(path: Path | None) -> dict[str, Any]:
     }
 
 
-def _persist_evidence_bundle(runtime: AgentRuntimeService, session: AgentSession, bundle: dict[str, Any], access_level: str) -> AgentSession:
+def _persist_evidence_bundle(
+    runtime: AgentRuntimeService, session: AgentSession, bundle: dict[str, Any], access_level: str
+) -> AgentSession:
     if not bundle:
         return session
     session.evidence_bundle = bundle

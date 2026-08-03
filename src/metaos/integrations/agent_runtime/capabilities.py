@@ -186,7 +186,7 @@ def load_profile_overlays(force: bool = False) -> dict[str, CapabilityProfile]:
         import yaml
 
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.warning("capability profile file unreadable %s: %s", path, e)
         return PROFILES
     profiles = data.get("profiles") if isinstance(data, dict) else None
@@ -198,7 +198,7 @@ def load_profile_overlays(force: bool = False) -> dict[str, CapabilityProfile]:
             continue
         try:
             PROFILES[str(name)] = _parse_profile_entry(str(name), raw)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.warning("invalid profile %s: %s", name, e)
     return PROFILES
 

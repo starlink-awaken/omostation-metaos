@@ -11,8 +11,8 @@ def get_cards_context() -> str:
     """
     # Try l4-kernel first
     try:
-        from l4_kernel import DomainRegistry
-        from l4_kernel.kems import CardsPlane
+        from l4_kernel import DomainRegistry  # type: ignore[reportMissingImports]
+        from l4_kernel.kems import CardsPlane  # type: ignore[reportMissingImports]
 
         registry = DomainRegistry()
         cockpit = registry.get("cockpit")
@@ -54,10 +54,10 @@ def get_cards_context() -> str:
                     if isinstance(fm, dict):
                         if fm.get("status") not in ("closed", "done") and fm.get("priority") == "P0":
                             active_p0.append(f"{fm.get('title', f.stem)} (Status: {fm.get('status', 'open')})")
-            except Exception as e:  # defensive fallback  # noqa: BLE001
+            except Exception as e:  # defensive fallback
                 logger.debug(f"Skipping malformed CARDS file {f.name}: {e}")
                 continue
-    except Exception as e:  # defensive fallback  # noqa: BLE001
+    except Exception as e:  # defensive fallback
         logger.warning(f"Failed to read CARDS: {e}")
         return ""
 

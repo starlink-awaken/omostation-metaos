@@ -78,22 +78,26 @@ def test_a2a_audit_trail(tmp_path):
 
     # 1. audit_log 写盘正常
     log = audit_log(tmp_path, "a2a-task")
-    log.append({
-        "ts": "2026-06-11T00:00:00Z",
-        "task_id": "task_1",
-        "service": "minerva",
-        "tool": "research",
-        "status": "submitted",
-        "event": "create",
-    })
-    log.append({
-        "ts": "2026-06-11T00:00:01Z",
-        "task_id": "task_1",
-        "service": "minerva",
-        "tool": "research",
-        "status": "working",
-        "event": "update:working",
-    })
+    log.append(
+        {
+            "ts": "2026-06-11T00:00:00Z",
+            "task_id": "task_1",
+            "service": "minerva",
+            "tool": "research",
+            "status": "submitted",
+            "event": "create",
+        }
+    )
+    log.append(
+        {
+            "ts": "2026-06-11T00:00:01Z",
+            "task_id": "task_1",
+            "service": "minerva",
+            "tool": "research",
+            "status": "working",
+            "event": "update:working",
+        }
+    )
 
     # 2. 验证文件
     audit_files = list(tmp_path.glob("a2a-task-*.jsonl"))
@@ -107,7 +111,8 @@ def test_a2a_audit_trail(tmp_path):
 
     # 3. 静态验证 task_manager._audit 调 audit_log
     from pathlib import Path
+
     src = Path("/Users/xiamingxing/Workspace/projects/metaos/src/metaos/a2a/task_manager.py").read_text()
     assert "audit_log" in src
     assert "_audit" in src
-    assert '"event": event' in src or "f'update:{status}'" in src or '"update:".' in src or 'update:{status}' in src
+    assert '"event": event' in src or "f'update:{status}'" in src or '"update:".' in src or "update:{status}" in src

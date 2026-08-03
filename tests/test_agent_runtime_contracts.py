@@ -29,7 +29,7 @@ class _Gate:
 
 def _engine(tmp_path: Path, level: DecisionLevel) -> SEngine:
     engine = SEngine(data_dir=str(tmp_path / "data"))
-    engine.gate = _Gate(level)
+    engine.gate = _Gate(level)  # type: ignore[reportAttributeAccessIssue]
     return engine
 
 
@@ -64,7 +64,9 @@ def test_r2_stage_green_session_is_prepared_then_finalized(tmp_path: Path) -> No
 
     running = runtime.mark_running(prepared)
     assert running.status == SessionStatus.RUNNING
-    finalized = runtime.finalize(running, summary="Patch staged", evidence=["git diff --check"], verification_passed=True)
+    finalized = runtime.finalize(
+        running, summary="Patch staged", evidence=["git diff --check"], verification_passed=True
+    )
     assert finalized.status == SessionStatus.FINALIZED
     assert finalized.evidence == ["git diff --check"]
     trace = engine.d.get_asset_trace(finalized.asset_id)

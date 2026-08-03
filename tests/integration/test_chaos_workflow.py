@@ -9,6 +9,7 @@ from metaos.core.workflow import Workflow, WorkflowNode
 
 logging.basicConfig(level=logging.INFO)
 
+
 @pytest.mark.asyncio
 async def test_chaos_timeout_and_cascade():
     """
@@ -21,6 +22,7 @@ async def test_chaos_timeout_and_cascade():
     # while 'gather_web' finishes normally.
     def chaotic_process(task):
         import time
+
         node_id = task.task_id.split("_")[-1]
         if "academic" in node_id:
             print(f"😈 [Chaos] Injecting delay into {node_id}!")
@@ -36,8 +38,17 @@ async def test_chaos_timeout_and_cascade():
     wf = Workflow("chaos_wf", mock_engine)
     wf.add_node(WorkflowNode(node_id="gather_web", task_type="mock_task", input_prompt="Web"))
     # Set a very short timeout to trigger the chaos cascade fast!
-    wf.add_node(WorkflowNode(node_id="gather_academic", task_type="mock_task", input_prompt="Academic", timeout_seconds=1))
-    wf.add_node(WorkflowNode(node_id="synthesize", task_type="reasoning", input_prompt="Combine", depends_on=["gather_web", "gather_academic"]))
+    wf.add_node(
+        WorkflowNode(node_id="gather_academic", task_type="mock_task", input_prompt="Academic", timeout_seconds=1)
+    )
+    wf.add_node(
+        WorkflowNode(
+            node_id="synthesize",
+            task_type="reasoning",
+            input_prompt="Combine",
+            depends_on=["gather_web", "gather_academic"],
+        )
+    )
 
     print("\n🚀 Starting Chaotic Workflow Execution...")
     await wf.run()
@@ -47,6 +58,7 @@ async def test_chaos_timeout_and_cascade():
     assert wf.nodes["gather_academic"].status == "timed_out", "Hanging node should fail via timeout"
     assert wf.nodes["synthesize"].status == "failed", "Downstream node should cascade-fail"
     print("✨ Chaos Test Passed! System is Anti-Fragile.")
+
 
 if __name__ == "__main__":
     asyncio.run(test_chaos_timeout_and_cascade())
