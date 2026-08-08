@@ -12,6 +12,7 @@ MetaOS Workflow Planner — 动态工作流生成器
 
 import json
 import logging
+import os
 import re
 from typing import Any
 
@@ -20,6 +21,12 @@ from metaos.core.workflow import Workflow
 from metaos.core.workflow_parser import WorkflowParser
 
 logger = logging.getLogger("metaos.workflow_planner")
+
+
+# LLM 推理端点: 默认 ollama 开发路径, 可通过 LLM_GATEWAY_URL 环境变量指向 omlxc/aetherforge 网关
+LLM_BASE_URL = os.environ.get("LLM_GATEWAY_URL", "http://localhost:11434/v1")
+LLM_CHAT_URL = f"{LLM_BASE_URL}/chat/completions"
+LLM_TAGS_URL = f"{LLM_BASE_URL.replace('/v1', '')}/api/tags"
 
 
 from pathlib import Path
@@ -103,7 +110,7 @@ class WorkflowPlanner:
 
             print(f"   🤖 调用 LLM ({model}) 生成规划...")
             r = requests.post(
-                "http://localhost:11434/v1/chat/completions",
+                LLM_CHAT_URL,
                 json={
                     "model": model,
                     "messages": [
@@ -142,14 +149,14 @@ class WorkflowPlanner:
         try:
             import requests
 
-            r = requests.get("http://localhost:11434/api/tags", timeout=5)
+            r = requests.get(LLM_TAGS_URL, timeout=5)
             available = {m["name"] for m in r.json().get("models", [])}
             for c in candidates:
                 for a in available:
                     if a.startswith(c.split(":")[0]):
                         # 快速验证 chat 接口
                         test = requests.post(
-                            "http://localhost:11434/v1/chat/completions",
+                            LLM_CHAT_URL,
                             json={
                                 "model": a,
                                 "messages": [{"role": "user", "content": "hi"}],
