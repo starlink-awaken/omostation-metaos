@@ -24,7 +24,7 @@ logger = logging.getLogger("metaos.workflow_planner")
 
 
 # LLM 推理端点: 默认 ollama 开发路径, 可通过 LLM_GATEWAY_URL 环境变量指向 omlxc/aetherforge 网关
-LLM_BASE_URL = os.environ.get("LLM_GATEWAY_URL", "http://localhost:11434/v1")
+LLM_BASE_URL = os.environ.get("AETHERFORGE_URL", os.environ.get("LLM_GATEWAY_URL", "http://127.0.0.1:9290/v1"))
 LLM_CHAT_URL = f"{LLM_BASE_URL}/chat/completions"
 LLM_TAGS_URL = f"{LLM_BASE_URL.replace('/v1', '')}/api/tags"
 
