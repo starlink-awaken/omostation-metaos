@@ -3,7 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from metaos_agentkit.service import create_task, install_global, install_local, status, uninstall_global  # type: ignore[reportMissingImports]
+from metaos_agentkit.service import (  # type: ignore[reportMissingImports]
+    create_task,
+    install_global,
+    install_local,
+    status,
+    uninstall_global,
+)
 
 
 def test_global_init_preserves_existing_content_and_is_idempotent(tmp_path: Path) -> None:

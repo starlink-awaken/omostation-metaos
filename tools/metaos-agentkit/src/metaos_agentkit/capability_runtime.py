@@ -17,7 +17,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
 _SECRET_READ_DENIES = [
     "~/.ssh/**",
     "~/.gnupg/**",

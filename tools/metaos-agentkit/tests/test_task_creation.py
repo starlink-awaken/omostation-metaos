@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from metaos_agentkit.task_creation import create_task  # type: ignore[reportMissingImports]
 
 

@@ -12,10 +12,10 @@ import shlex
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 from uuid import uuid4
 
 from .capability_runtime import ProviderRuntimePlan, render_plan

@@ -15,7 +15,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-
 SESSION_FILES = (
     "final-session.json",
     "running-session.json",

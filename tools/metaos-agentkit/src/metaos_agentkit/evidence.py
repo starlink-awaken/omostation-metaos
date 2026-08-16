@@ -9,7 +9,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-
 MAX_EVIDENCE_BYTES = 1_000_000
 
 

@@ -19,7 +19,6 @@ from .task_actions import (
 )
 from .task_creation import create_task
 
-
 PROFILE_NAMES = [
     "core",
     "repo-read",
