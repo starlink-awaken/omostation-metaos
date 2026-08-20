@@ -15,10 +15,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Checkout sibling repos (../agora, ../l4-kernel, ../bus-foundation)
-        # metaos pyproject 用 [tool.uv.sources] path 依赖兄弟仓库 (均为 public), 直接 clone 到上级
+        # metaos pyproject 用 [tool.uv.sources] path 依赖兄弟仓库 (agora/bus-foundation 为 private,
+        # 需 OMOSTATION_BOT_TOKEN), clone 到  上级目录
+        env:
+          BOT_TOKEN: ${{ secrets.OMOSTATION_BOT_TOKEN }}
         run: |
-          for repo in omostation-agora omostation-l4-kernel omostation-bus-foundation; do
-            git clone --depth 1 https://github.com/starlink-awaken/$repo ../${repo#omostation-}
+          for repo in agora l4-kernel bus-foundation; do
+            if [ -n "$BOT_TOKEN" ]; then
+              git clone --depth 1 "https://${BOT_TOKEN}@github.com/starlink-awaken/omostation-$repo" ../$repo
+            else
+              git clone --depth 1 "https://github.com/starlink-awaken/omostation-$repo" ../$repo
+            fi
           done
       - uses: astral-sh/setup-uv@v5
         with:
@@ -39,10 +46,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Checkout sibling repos (../agora, ../l4-kernel, ../bus-foundation)
-        # metaos pyproject 用 [tool.uv.sources] path 依赖兄弟仓库 (均为 public), 直接 clone 到上级
+        # metaos pyproject 用 [tool.uv.sources] path 依赖兄弟仓库 (agora/bus-foundation 为 private,
+        # 需 OMOSTATION_BOT_TOKEN), clone 到  上级目录
+        env:
+          BOT_TOKEN: ${{ secrets.OMOSTATION_BOT_TOKEN }}
         run: |
-          for repo in omostation-agora omostation-l4-kernel omostation-bus-foundation; do
-            git clone --depth 1 https://github.com/starlink-awaken/$repo ../${repo#omostation-}
+          for repo in agora l4-kernel bus-foundation; do
+            if [ -n "$BOT_TOKEN" ]; then
+              git clone --depth 1 "https://${BOT_TOKEN}@github.com/starlink-awaken/omostation-$repo" ../$repo
+            else
+              git clone --depth 1 "https://github.com/starlink-awaken/omostation-$repo" ../$repo
+            fi
           done
       - uses: astral-sh/setup-uv@v5
         with:
