@@ -112,7 +112,7 @@ def test_a2a_audit_trail(tmp_path):
     # 3. 静态验证 task_manager._audit 调 audit_log
     from pathlib import Path
 
-    src = Path("/Users/xiamingxing/Workspace/projects/metaos/src/metaos/a2a/task_manager.py").read_text()
+    src = (Path(__file__).resolve().parent.parent / "src/metaos/a2a/task_manager.py").read_text()
     assert "audit_log" in src
     assert "_audit" in src
     assert '"event": event' in src or "f'update:{status}'" in src or '"update:".' in src or "update:{status}" in src
