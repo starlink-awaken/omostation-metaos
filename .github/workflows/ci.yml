@@ -20,7 +20,7 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.OMOSTATION_BOT_TOKEN }}
         run: |
-          for repo in agora l4-kernel bus-foundation; do
+          for repo in agora l4-kernel bus-foundation ecos; do
             if [ -n "$BOT_TOKEN" ]; then
               git clone --depth 1 "https://${BOT_TOKEN}@github.com/starlink-awaken/omostation-$repo" ../$repo
             else
@@ -51,7 +51,7 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.OMOSTATION_BOT_TOKEN }}
         run: |
-          for repo in agora l4-kernel bus-foundation; do
+          for repo in agora l4-kernel bus-foundation ecos; do
             if [ -n "$BOT_TOKEN" ]; then
               git clone --depth 1 "https://${BOT_TOKEN}@github.com/starlink-awaken/omostation-$repo" ../$repo
             else
