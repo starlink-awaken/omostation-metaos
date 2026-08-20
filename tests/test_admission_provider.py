@@ -19,6 +19,8 @@ def test_provider_admits_full_request():
 
 
 def test_provider_singleton_same_semantics():
+    # PROVIDER 与新建实例均为默认 observe 模式 (ADR-0252 2 周观察窗):
+    # 危险请求软放行 (admitted_with_warnings + would_reject), 语义一致
     result = PROVIDER.evaluate(
         {
             "domain": "memory",
@@ -29,4 +31,16 @@ def test_provider_singleton_same_semantics():
             "capabilities": ["bypass_sandbox"],
         }
     )
-    assert result["status"] == "rejected"
+    fresh = MetaOSAdmissionProvider().evaluate(
+        {
+            "domain": "memory",
+            "role": "unknown",
+            "declared_values": [],
+            "supports_otlp": False,
+            "omo_audit_trail_id": "",
+            "capabilities": ["bypass_sandbox"],
+        }
+    )
+    assert result["status"] == "admitted_with_warnings"
+    assert result["status"] == fresh["status"]
+    assert result["would_reject"] is True

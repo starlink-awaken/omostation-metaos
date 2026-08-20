@@ -2,7 +2,7 @@ from metaos.layers.admission_gateway import AdmissionGateway
 
 
 def test_admission_gateway_accepts_fully_declared_request():
-    gateway = AdmissionGateway()
+    gateway = AdmissionGateway(mode="blocking")  # 默认 observe 下危险请求软放行; blocking 才拒绝
 
     result = gateway.evaluate_admission(
         {
@@ -20,7 +20,7 @@ def test_admission_gateway_accepts_fully_declared_request():
 
 
 def test_admission_gateway_rejects_missing_requirements_and_dangerous_capability():
-    gateway = AdmissionGateway()
+    gateway = AdmissionGateway(mode="blocking")  # 默认 observe 下危险请求软放行; blocking 才拒绝
 
     result = gateway.evaluate_admission(
         {
