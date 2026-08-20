@@ -15,12 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Checkout sibling repos (../agora, ../l4-kernel, ../bus-foundation)
-        # metaos pyproject 用 [tool.uv.sources] path 依赖兄弟仓库, 需先 checkout 到上级
-        env:
-          GH_TOKEN: ${{ github.token }}
+        # metaos pyproject 用 [tool.uv.sources] path 依赖兄弟仓库 (均为 public), 直接 clone 到上级
         run: |
           for repo in omostation-agora omostation-l4-kernel omostation-bus-foundation; do
-            git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/starlink-awaken/$repo ../${repo#omostation-}
+            git clone --depth 1 https://github.com/starlink-awaken/$repo ../${repo#omostation-}
           done
       - uses: astral-sh/setup-uv@v5
         with:
@@ -41,12 +39,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Checkout sibling repos (../agora, ../l4-kernel, ../bus-foundation)
-        # metaos pyproject 用 [tool.uv.sources] path 依赖兄弟仓库, 需先 checkout 到上级
-        env:
-          GH_TOKEN: ${{ github.token }}
+        # metaos pyproject 用 [tool.uv.sources] path 依赖兄弟仓库 (均为 public), 直接 clone 到上级
         run: |
           for repo in omostation-agora omostation-l4-kernel omostation-bus-foundation; do
-            git clone --depth 1 https://x-access-token:${GH_TOKEN}@github.com/starlink-awaken/$repo ../${repo#omostation-}
+            git clone --depth 1 https://github.com/starlink-awaken/$repo ../${repo#omostation-}
           done
       - uses: astral-sh/setup-uv@v5
         with:
