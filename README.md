@@ -1,3 +1,10 @@
+---
+type: derived
+source: projects/metaos
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # MetaOS
 
 🌐 [简体中文](README.zh.md)
