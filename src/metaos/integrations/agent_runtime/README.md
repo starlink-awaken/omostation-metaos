@@ -1,3 +1,10 @@
+---
+type: derived
+source: projects/metaos
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # Agent Runtime Integration
 
 This package is the single contract boundary between MetaOS governance and provider-specific command-line adapters.
