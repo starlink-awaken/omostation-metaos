@@ -1,3 +1,9 @@
+---
+type: ssot
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # MetaOS 能力地图
 
 > 编排引擎 · 决策门控 · 免疫监控 · 路由

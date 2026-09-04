@@ -1,3 +1,9 @@
+---
+type: ssot
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # Capability Profiles
 
 A capability profile is the maximum authority a provider adapter may materialize for one MetaOS `AgentSession`.

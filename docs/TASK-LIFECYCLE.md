@@ -1,3 +1,9 @@
+---
+type: ssot
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # AgentKit Task Lifecycle
 
 AgentKit task directories are provider-local projections. MetaOS Core remains the canonical source of truth for Gate, approval, session state, decisions, assets, and trace records.

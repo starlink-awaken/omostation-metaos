@@ -1,3 +1,9 @@
+---
+type: ssot
+owner: governance-team
+last_updated: 2026-09-03
+---
+
 # CLAUDE.md — MetaOS 编排引擎
 
 > L2 编排引擎 · 决策门控 + 免疫监控 + 工作流引擎 + MCP 服务
