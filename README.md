@@ -69,8 +69,8 @@ metaos-mcp                     # 启动 MCP stdio 服务 (JSON-RPC)
 ## 迁移历史
 
 - **2026-06-06** 从 `projects/kairon/packages/metaos` 拆出 (P30-W1 METAOS-EXTRACT)
-  - 源码 ~3,453 行 (14 modules, 5 sub-modules)
-  - 测试 1,611 行
+  - 源码行数/模块数以实际文件为准 (`find src -name "*.py" | wc -l`)
+  - 测试行数以实际文件为准 (`find tests -name "*.py" | wc -l`)
   - git 历史: 通过 `git mv` 至 kairon `_staging` 中转, 然后物理迁出 (保留 rename 检测)
   - 7.1.0 → 0.1.0 (独立项目, 重新计版本)
 
