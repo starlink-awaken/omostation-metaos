@@ -61,7 +61,7 @@ class OllamaBackend(ModelBackend):
         self.base_url = (
             base_url
             or (standard_base_url if use_standard and standard_base_url else None)
-            or os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+            or os.environ.get("LLM_GATEWAY_URL", "http://127.0.0.1:4000/v1")
         )
         self.model = (
             model or (standard_model if use_standard and standard_model else None) or os.environ.get("OLLAMA_MODEL", "")
