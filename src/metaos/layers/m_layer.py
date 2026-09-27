@@ -44,7 +44,9 @@ class OllamaBackend(ModelBackend):
 
     环境变量：
       LLM_GATEWAY_URL  — 门面地址(默认 http://127.0.0.1:4000, 带不带 /v1 均可)
-      LLM_MODEL / OLLAMA_MODEL — 门面别名(默认 fast)
+      LLM_MODEL / METAOS_LLM_MODEL — 门面别名(默认 fast)
+      (不读 OLLAMA_MODEL: 它是 Ollama 原生模型名, shell 里常被全局导出(如 gemma4:e4b),
+       当成门面别名会让门面静默兜底到别的档)
       OLLAMA_TIMEOUT   — 请求超时秒数（默认 120）
     """
 
@@ -66,7 +68,7 @@ class OllamaBackend(ModelBackend):
         self.model = (
             model
             or (standard_model if use_standard and standard_model else None)
-            or os.environ.get("OLLAMA_MODEL", "")
+            or os.environ.get("METAOS_LLM_MODEL", "")
             or llm_gateway.DEFAULT_MODEL
         )
         self.timeout = int(os.environ.get("OLLAMA_TIMEOUT", "120"))
