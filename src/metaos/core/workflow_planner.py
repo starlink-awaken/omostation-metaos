@@ -23,10 +23,12 @@ from metaos.core.workflow_parser import WorkflowParser
 logger = logging.getLogger("metaos.workflow_planner")
 
 
-# LLM 推理端点: 默认 ollama 开发路径, 可通过 LLM_GATEWAY_URL 环境变量指向 omlxc/aetherforge 网关
-LLM_BASE_URL = os.environ.get("AETHERFORGE_URL", os.environ.get("LLM_GATEWAY_URL", "http://127.0.0.1:4000/v1"))
-LLM_CHAT_URL = f"{LLM_BASE_URL}/chat/completions"
-LLM_TAGS_URL = f"{LLM_BASE_URL.replace('/v1', '')}/api/tags"
+# LLM 推理端点: aetherforge 门面(地址/密钥/默认别名见 metaos.core.llm_gateway)
+from metaos.core import llm_gateway
+
+LLM_CHAT_URL = f"{llm_gateway.root()}/v1/chat/completions"
+# 门面别名; 旧实现从 Ollama /api/tags 挑原生模型名(门面无此路由 → 恒失败 → 静默走启发式)
+PLANNER_MODEL = os.environ.get("METAOS_PLANNER_MODEL", llm_gateway.DEFAULT_MODEL)
 
 
 from pathlib import Path
@@ -92,11 +94,7 @@ class WorkflowPlanner:
         try:
             import requests
 
-            # 优先选择支持 chat 的模型（跳过 gemma4，它不支持）
-            preferred_models = ["qwen3.5:4b", "qwen3.5:9b", "fredrezones55/Qwopus3.5:9b"]
-            model = self._pick_working_model(preferred_models)
-            if not model:
-                return None
+            model = PLANNER_MODEL
 
             # Load L4 CARDS context for alignment
             from metaos.core.cards_context import get_cards_context
@@ -111,6 +109,7 @@ class WorkflowPlanner:
             print(f"   🤖 调用 LLM ({model}) 生成规划...")
             r = requests.post(
                 LLM_CHAT_URL,
+                headers=llm_gateway.auth_headers(),
                 json={
                     "model": model,
                     "messages": [
@@ -121,7 +120,7 @@ class WorkflowPlanner:
                     "max_tokens": 1024,
                     "stream": False,
                 },
-                timeout=60,
+                timeout=180,
             )
 
             if r.status_code != 200:
@@ -143,33 +142,6 @@ class WorkflowPlanner:
         except Exception as e:  # defensive fallback
             logger.warning(f"LLM planning failed: {e}")
             return None
-
-    def _pick_working_model(self, candidates: list[str]) -> str | None:
-        """选出一个实际可用（支持 chat）的 Ollama 模型"""
-        try:
-            import requests
-
-            r = requests.get(LLM_TAGS_URL, timeout=5)
-            available = {m["name"] for m in r.json().get("models", [])}
-            for c in candidates:
-                for a in available:
-                    if a.startswith(c.split(":")[0]):
-                        # 快速验证 chat 接口
-                        test = requests.post(
-                            LLM_CHAT_URL,
-                            json={
-                                "model": a,
-                                "messages": [{"role": "user", "content": "hi"}],
-                                "max_tokens": 5,
-                                "stream": False,
-                            },
-                            timeout=30,
-                        )
-                        if test.status_code == 200:
-                            return a
-        except Exception:  # defensive fallback
-            pass
-        return None
 
     def _extract_json(self, text: str) -> dict[str, Any] | None:
         """从 LLM 输出中提取 JSON（兼容 markdown 代码块和 qwen3.5 <think> 标签）"""

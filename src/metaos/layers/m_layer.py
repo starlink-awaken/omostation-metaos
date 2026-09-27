@@ -38,37 +38,38 @@ class ModelBackend:
 
 
 class OllamaBackend(ModelBackend):
-    """Ollama 本地 LLM 后端
+    """本地 LLM 后端 —— 经 aetherforge 门面(OpenAI 兼容 API)
 
-    通过 Ollama 的 OpenAI 兼容 API 调用本地模型。
-    配置优先级：环境变量 > .env 文件 > 默认值
+    类名沿用 OllamaBackend 以兼容既有引用; 本地推理现只走门面(见 metaos.core.llm_gateway)。
 
     环境变量：
-      OLLAMA_BASE_URL  — Ollama 服务地址（默认 http://localhost:11434）
-      OLLAMA_MODEL     — 模型名称（默认从 /api/tags 自动选择）
-      OLLAMA_TIMEOUT   — 请求超时秒数（默认 60）
+      LLM_GATEWAY_URL  — 门面地址(默认 http://127.0.0.1:4000, 带不带 /v1 均可)
+      LLM_MODEL / OLLAMA_MODEL — 门面别名(默认 fast)
+      OLLAMA_TIMEOUT   — 请求超时秒数（默认 120）
     """
 
     def __init__(self, base_url: str = "", model: str = ""):
         import requests as req
 
+        from metaos.core import llm_gateway
+
         self._requests = req
+        self._gw = llm_gateway
 
         standard_provider = os.environ.get("LLM_PROVIDER", "").strip().lower()
         standard_base_url = os.environ.get("LLM_BASE_URL")
         standard_model = os.environ.get("LLM_MODEL")
-        use_standard = standard_provider in {"", "ollama"}
-        self.base_url = (
-            base_url
-            or (standard_base_url if use_standard and standard_base_url else None)
-            or os.environ.get("LLM_GATEWAY_URL", "http://127.0.0.1:4000/v1")
+        use_standard = standard_provider in {"", "ollama", "gateway", "aetherforge"}
+        self.base_url = llm_gateway.root(
+            base_url or (standard_base_url if use_standard and standard_base_url else None)
         )
         self.model = (
-            model or (standard_model if use_standard and standard_model else None) or os.environ.get("OLLAMA_MODEL", "")
+            model
+            or (standard_model if use_standard and standard_model else None)
+            or os.environ.get("OLLAMA_MODEL", "")
+            or llm_gateway.DEFAULT_MODEL
         )
         self.timeout = int(os.environ.get("OLLAMA_TIMEOUT", "120"))
-        # keep_alive: 模型在内存中驻留时间（默认 24h），避免每次 CLI 调用都重载模型
-        self.keep_alive = os.environ.get("OLLAMA_KEEP_ALIVE", "24h")
         self._available = False
         self._detected_models: list[str] = []
 
@@ -78,78 +79,30 @@ class OllamaBackend(ModelBackend):
     # ── 自动检测 ──
 
     def _auto_detect(self):
-        """自动检测 Ollama 服务可用性并获取可用模型列表"""
+        """探测门面 /health(免鉴权)。旧实现探测 Ollama 的 /api/tags —— 门面无此路由, 恒判不可用。"""
         try:
-            r = self._requests.get(
-                f"{self.base_url}/api/tags",
-                timeout=5,
-            )
+            r = self._requests.get(f"{self.base_url}/health", timeout=5)
             if r.status_code == 200:
-                data = r.json()
-                models = [m["name"] for m in data.get("models", [])]
-                self._detected_models = models
-
-                if not self.model and models:
-                    # 自动选择：Gemma4(最稳定) > Qwen(纯) > Qwopus > MoE > Llama > 其他
-                    for preferred in [
-                        "gemma4:e4b",
-                        "gemma4:e2b",
-                        "gemma4",
-                        "qwen3.5:4b",
-                        "qwen3.5:7b",
-                        "qwen3.5:9b",
-                        "qwopus3.5",
-                        "qwopus",
-                        "qwen3.6",
-                        "llama3.2",
-                        "llama3.1",
-                        "llama3",
-                        "qwen2.5",
-                    ]:
-                        match = [m for m in models if m.startswith(preferred)]
-                        if match:
-                            self.model = match[0]
-                            break
-                    if not self.model and models:
-                        # 跳过已知的 thinking 慢模型
-                        no_thinking = [
-                            m
-                            for m in models
-                            if "deepseek" not in m.lower() and "r1" not in m.lower() and "think" not in m.lower()
-                        ]
-                        self.model = no_thinking[0] if no_thinking else models[0]
-
-                if self.model:
-                    self._available = True
-                    logger.info(
-                        "Ollama 检测通过 | 端点=%s 模型=%s 可用=%d",
-                        self.base_url,
-                        self.model,
-                        len(models),
-                    )
-                else:
-                    logger.warning("Ollama 已连接但未找到可用模型")
+                self._available = True
+                logger.info("LLM 门面检测通过 | 端点=%s 模型=%s", self.base_url, self.model)
             else:
-                logger.warning("Ollama 返回异常状态码: %s", r.status_code)
+                logger.warning("LLM 门面返回异常状态码: %s", r.status_code)
         except Exception as exc:  # defensive fallback
-            logger.info("Ollama 不可用（将使用 Mock 降级）: %s", exc)
+            logger.info("LLM 门面不可用（将使用 Mock 降级）: %s", exc)
 
     def health(self) -> bool:
-        """健康检查——返回 Ollama 是否可用"""
+        """健康检查——返回门面是否可用"""
         if not self._available:
             return False
         try:
-            r = self._requests.get(
-                f"{self.base_url}/api/tags",
-                timeout=5,
-            )
+            r = self._requests.get(f"{self.base_url}/health", timeout=5)
             return r.status_code == 200
         except Exception:  # defensive fallback
             self._available = False
             return False
 
     def call(self, task: Task, model_id: str = "") -> TaskResult:
-        """调用 Ollama 模型——使用自动检测的真实模型名，忽略逻辑 model_id"""
+        """经门面调用本地模型——使用配置的门面别名，忽略逻辑 model_id"""
         start = time.time()
 
         if not self._available:
@@ -160,7 +113,7 @@ class OllamaBackend(ModelBackend):
                 latency_ms=int((time.time() - start) * 1000),
             )
 
-        model = self.model  # 始终用自动检测的真实 Ollama 模型名
+        model = self.model  # 门面别名
         if not model:
             return TaskResult(
                 task_id=task.task_id,
@@ -172,6 +125,7 @@ class OllamaBackend(ModelBackend):
         try:
             r = self._requests.post(
                 f"{self.base_url}/v1/chat/completions",
+                headers=self._gw.auth_headers(),
                 json={
                     "model": model,
                     "messages": [
@@ -185,7 +139,6 @@ class OllamaBackend(ModelBackend):
                     "temperature": 0.1,  # 低温度减少发散思考
                     "max_tokens": 1024,  # 限制输出长度
                     "stream": False,
-                    "keep_alive": self.keep_alive,  # 常驻内存
                 },
                 timeout=self.timeout,
             )
